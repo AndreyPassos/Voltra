@@ -65,6 +65,8 @@ struct ActiveApp: Identifiable, Equatable {
     let name: String
     let processes: [AudioObjectID]
     var bundleURL: URL? = nil
+    var inputActive: Bool = false
+    var nativeOutputIDs: [AudioObjectID]? = nil
 }
 struct AppMix: Codable, Equatable {
     var volume: Float
@@ -90,6 +92,12 @@ enum AppOutputSupport {
 enum AppRoute {
     static func output(for uid: String?, devices: [AudioDevice], defaultID: AudioObjectID) -> AudioDevice? {
         devices.first { $0.output && (uid == nil ? $0.id == defaultID : $0.uid == uid) }
+    }
+}
+
+enum CommunicationPassthroughPolicy {
+    static func canBypass(app: ActiveApp, mix: AppMix, output: AudioDevice) -> Bool {
+        app.inputActive && mix.volume == 1 && !mix.muted && app.nativeOutputIDs == [output.id]
     }
 }
 
@@ -194,6 +202,7 @@ final class AudioService: ObservableObject {
     @Published var activeApps: [ActiveApp] = []
     @Published var appSettings: [String: AppMix] = [:]
     @Published var controlledApps: Set<String> = []
+    @Published private(set) var passthroughApps: Set<String> = []
     private var tapSessions: [String: Any] = [:]
     private var audioWorkers: [String: AudioWorker] = [:]
     private var pendingStarts: [String: (UUID, SessionSignature)] = [:]
@@ -373,6 +382,17 @@ final class AudioService: ObservableObject {
         let status = result.withUnsafeMutableBytes { AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &a, 0, nil, &size, $0.baseAddress!) }
         return status == noErr ? result : []
     }
+    @available(macOS 14.2, *)
+    private func processOutputDevices(_ object: AudioObjectID) -> [AudioObjectID]? {
+        var property = address(kAudioProcessPropertyDevices, kAudioObjectPropertyScopeOutput)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(object, &property, 0, nil, &size) == noErr,
+              size > 0, size % UInt32(MemoryLayout<AudioObjectID>.size) == 0 else { return nil }
+        var result = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        let status = result.withUnsafeMutableBytes { AudioObjectGetPropertyData(object, &property, 0, nil, &size, $0.baseAddress!) }
+        guard status == noErr, size == result.count * MemoryLayout<AudioObjectID>.size else { return nil }
+        return result
+    }
     func refresh() {
         let found = ids(kAudioHardwarePropertyDevices).map { id in
             let transport = scalar(id, kAudioDevicePropertyTransportType, default: UInt32(0))
@@ -405,14 +425,26 @@ final class AudioService: ObservableObject {
         }
         if #available(macOS 14.2, *) {
             var groups: [String: ActiveApp] = [:]
+            var inputApps: Set<String> = []
+            var outputDevices: [String: Set<AudioObjectID>] = [:]
+            var unknownOutputApps: Set<String> = []
             for object in ids(kAudioHardwarePropertyProcessObjectList) {
-                let running: UInt32 = scalar(object, kAudioProcessPropertyIsRunningOutput, default: UInt32(0))
-                guard running != 0 else { continue }
+                let runningOutput: UInt32 = scalar(object, kAudioProcessPropertyIsRunningOutput, default: UInt32(0))
+                let runningInput: UInt32 = scalar(object, kAudioProcessPropertyIsRunningInput, default: UInt32(0))
+                guard runningOutput != 0 || runningInput != 0 else { continue }
                 let pid: pid_t = scalar(object, kAudioProcessPropertyPID, default: pid_t(0))
                 guard pid != ProcessInfo.processInfo.processIdentifier, let identity = ApplicationIdentity.resolveProcess(pid) else { continue }
                 let key = identity.id
+                if runningInput != 0 { inputApps.insert(key) }
+                guard runningOutput != 0 else { continue }
+                if let devices = processOutputDevices(object) { outputDevices[key, default: []].formUnion(devices) }
+                else { unknownOutputApps.insert(key) }
                 let processIDs = (groups[key]?.processes ?? []) + [object]
                 groups[key] = ActiveApp(id: key, name: identity.name, processes: processIDs.sorted(), bundleURL: identity.bundleURL)
+            }
+            for key in Array(groups.keys) {
+                groups[key]?.inputActive = inputApps.contains(key)
+                groups[key]?.nativeOutputIDs = unknownOutputApps.contains(key) ? nil : outputDevices[key].map { $0.sorted() }
             }
             activeApps = groups.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             let wanted = controlPreferences.enabled.union(groups.keys.filter { controlPreferences.shouldControl($0) })
@@ -435,6 +467,11 @@ final class AudioService: ObservableObject {
                 let app = groups[key]
                 let output = AppRoute.output(for: settings(for: key).outputUID, devices: found, defaultID: defaultOutput)
                 let candidate = app.flatMap { app in output.map { SessionSignature(processes: app.processes, outputUID: $0.uid, outputID: sessionDeviceID($0)) } }
+                if let app, let output, CommunicationPassthroughPolicy.canBypass(app: app, mix: settings(for: key), output: output) {
+                    if !passthroughApps.contains(key) { teardownApp(key); passthroughApps.insert(key) }
+                    continue
+                }
+                passthroughApps.remove(key)
                 if let pending = pendingStarts[key] {
                     if pending.1 == candidate { continue }
                     pendingStarts.removeValue(forKey: key)
@@ -688,6 +725,7 @@ final class AudioService: ObservableObject {
         if let data = try? JSONEncoder().encode(appSettings) { defaults.set(data, forKey: "appMix") }
         saveActiveProfileSnapshot()
         if #available(macOS 14.2, *), let tap = tapSessions[app.id] as? any ManagedAudioSession { tap.setGain(state.volume, muted: state.muted) }
+        if activeApps.contains(where: { $0.id == app.id && $0.inputActive }) { refresh() }
     }
     func setAppOutput(_ app: ActiveApp, uid: String?) {
         var state = settings(for: app.id)
@@ -826,6 +864,7 @@ final class AudioService: ObservableObject {
         }
     }
     private func teardownApp(_ id: String) {
+        passthroughApps.remove(id)
         pendingStarts.removeValue(forKey: id)
         startingApps.remove(id)
         stalledStarts.remove(id)
