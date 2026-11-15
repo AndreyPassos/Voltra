@@ -34,7 +34,6 @@ final class ConcurrentTapIntegrationTests: XCTestCase {
             try process.run(); return process
         }
         let first = try startSource(firstPath); defer { if first.isRunning { first.terminate(); first.waitUntilExit() } }
-        let second = try startSource(secondPath); defer { if second.isRunning { second.terminate(); second.waitUntilExit() } }
         func object(for pid: pid_t) throws -> AudioObjectID {
             var object: AudioObjectID = 0
             let deadline = Date().addingTimeInterval(4)
@@ -47,13 +46,20 @@ final class ConcurrentTapIntegrationTests: XCTestCase {
             } while Date() < deadline
             throw XCTSkip("Processo de áudio não apareceu")
         }
-        let firstObject = try object(for: first.processIdentifier), secondObject = try object(for: second.processIdentifier)
-        XCTAssertNotEqual(firstObject, secondObject)
+        let firstObject = try object(for: first.processIdentifier)
         let firstTap = ProcessTap(), secondTap = ProcessTap()
         firstTap.setGain(0.25, muted: false); secondTap.setGain(0.75, muted: false)
         try firstTap.start(processes: [firstObject], output: output); defer { firstTap.stop() }
+        Thread.sleep(forTimeInterval: 0.5)
+        let beforeSecondApp = firstTap.diagnostics
+        XCTAssertGreaterThan(beforeSecondApp.1, 0.001)
+        XCTAssertEqual(beforeSecondApp.2 / beforeSecondApp.1, 0.25, accuracy: 0.02)
+        let second = try startSource(secondPath); defer { if second.isRunning { second.terminate(); second.waitUntilExit() } }
+        let secondObject = try object(for: second.processIdentifier)
+        XCTAssertNotEqual(firstObject, secondObject)
         try secondTap.start(processes: [secondObject], output: output); defer { secondTap.stop() }
         Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertGreaterThan(firstTap.diagnostics.0, beforeSecondApp.0, "The first stream must continue after the second app starts")
         XCTAssertGreaterThan(firstTap.diagnostics.1, 0.001)
         XCTAssertGreaterThan(secondTap.diagnostics.1, 0.001)
         XCTAssertEqual(firstTap.diagnostics.2 / firstTap.diagnostics.1, 0.25, accuracy: 0.02)
