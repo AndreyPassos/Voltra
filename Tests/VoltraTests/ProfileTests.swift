@@ -78,6 +78,27 @@ final class ProfileTests: XCTestCase {
 }
 
 final class IsolatedServiceTests: XCTestCase {
+    func testChangingOneAppPreservesOtherAppsMixAndRouteAfterRestart() throws {
+        let suite = "VoltraIndependentApps-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var control = AppControlPreferences(); control.automatic = false; control.save(to: defaults)
+        let service = AudioService(defaults: defaults, startTimer: false)
+        let music = ActiveApp(id: "example.music", name: "Music", processes: [])
+        let call = ActiveApp(id: "example.call", name: "Call", processes: [])
+        service.setAppMix(music, volume: 0.37, muted: false)
+        service.setAppOutput(music, uid: "preferred-music-output")
+        let expected = service.settings(for: music.id)
+        service.setAppMix(call, volume: 0.81, muted: true)
+        service.setAppOutput(call, uid: "preferred-call-output")
+        XCTAssertEqual(service.settings(for: music.id), expected)
+        let active = try XCTUnwrap(service.activeProfileID)
+        XCTAssertEqual(service.profiles.first(where: { $0.id == active })?.appMix?[music.id], expected)
+        let reopened = AudioService(defaults: defaults, startTimer: false)
+        XCTAssertEqual(reopened.settings(for: music.id), expected)
+        XCTAssertEqual(reopened.settings(for: call.id).volume, 0.81)
+        XCTAssertEqual(reopened.settings(for: call.id).outputUID, "preferred-call-output")
+    }
     func testOnlyActiveProfileReceivesAppChangesAndSelectionPersists() throws {
         let suite = "VoltraActiveProfile-" + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
