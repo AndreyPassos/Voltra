@@ -1,0 +1,254 @@
+# Voltra — plano e progresso
+
+Especificação: briefing e referências apresentados na conversa; a implementação atual e suas restrições são descritas no README. O projeto usa SwiftUI, Core Audio e macOS 14.2+.
+
+1. **Mixer por aplicativo:** captura por Process Tap, processamento de ganho/mute, reprodução, tratamento de erros e permissão; selecionar saída individual, retomar sessões e testar com aplicativo real. Há testes anteriores com fonte nativa, QCY e alto-falantes, mas a inicialização bloqueou novamente na versão aberta e em um diagnóstico isolado de agregado com tap. Confiabilidade, validação auditiva, interface completa e operação prolongada continuam pendentes.
+2. **Dispositivos:** preferências separadas, fallback e reconexão; testar decisões e aplicação real, preservando o estado do usuário. Implementado com eventos Core Audio, suporte a volume por canal, teste de volume real e associação conservadora do QCY. Uma desconexão e reconexão física confirmou fallback e restauração da saída com o Voltra ativo; a entrada permaneceu interna conforme a preferência existente. Um segundo ciclo físico com o headset preferido como entrada e saída confirmou o retorno aos dispositivos internos e a restauração de ambos após reconexão, com o Voltra ativo.
+3. **Perfis:** persistir conjuntos nomeados de entrada, saída, volume geral e preferências por aplicativo e permitir criar, aplicar e excluir; testar persistência e aplicação. Implementado com testes de persistência e aplicação usando dispositivos reais.
+4. **Automações:** conexão, abertura de aplicativo e horário diário, com prioridade determinística e persistência. Testes de regra, abertura real de aplicativo e agendamento com dispositivos reais passaram; uma desconexão e reconexão física da saída foi observada.
+5. **Acabamento e validação:** onboarding, telas e controle de aplicativo de teste verificados na interface; inicialização do áudio movida para fora da fila da interface. Notificações opcionais e atalhos de mute local e global implementados; registro e evento do atalho global testados no próprio processo. Continuam pendentes validação auditiva prolongada, permissões e login real na instalação final.
+
+O QCY usa 44,1 kHz enquanto o tap anuncia 48 kHz; a compensação do agregado foi testada por 15 segundos com sinal controlado. Faltam validação auditiva e testes mais longos. As sessões retomam após mudanças de dispositivo ou processo; há até duas tentativas automáticas após falhas, seguidas de reativação manual.
+
+## Limitações e próximos pontos
+
+- Saídas com entrada integrada no mesmo objeto Core Audio são recusadas para captura por aplicativo: um dispositivo virtual de teste confirmou o ajuste de desativação, mas ainda apresentou um buffer de entrada; não é seguro presumir isolamento do microfone.
+- Regras por horário são diárias e retomam a ocorrência mais recente após um intervalo de repouso enquanto o Voltra permanece aberto; regras de aplicativo exigem que ele esteja aberto no momento da configuração.
+- Testes de audição, latência e operação prolongada precisam de acompanhamento humano; o teste de buffers mede sinal, ganho e continuidade, não percepção sonora.
+- O QCY foi reconectado pelo usuário; o fallback e a restauração da saída foram observados com o Voltra ativo. Em outro ciclo, entrada e saída preferidas no QCY voltaram aos dispositivos internos e retornaram ao QCY após reconexão. A preferência original pelo microfone interno foi restaurada. O macOS também pode participar da seleção.
+
+Última validação incremental: volume geral por canais e observação por evento testados no hardware; captura mono no perfil de chamada do QCY testada antes da desconexão; registro e remoção de um aplicativo temporário como item de início verificados. A seleção de headset usa identificadores Bluetooth correspondentes e recusa associação incerta.
+
+Validação de 13/11/2026: 59 testes passaram com testes de hardware, Process Tap, atalho e item de início habilitados. O teste específico do QCY em modo de chamada também passou; build de produção, assinatura local e Info.plist foram verificados.
+
+Ajuste de interface: a área inteira dos itens da barra lateral recebe cliques; as bordas de Applications, Devices e Mixer foram verificadas na aplicação compilada. O usuário confirmou o controle de volume geral durante reprodução do YouTube; o controle por aplicativo ainda aguarda validação auditiva.
+
+Correção de identificação: processos auxiliares sem NSRunningApplication agora são resolvidos pelo caminho do executável e pelo aplicativo que os contém. O Opera GX com YouTube foi detectado na interface; ativação, ajuste e mute foram exercitados visualmente. O ícone gerado usa o mesmo símbolo da marca que já existia na interface. Após essas mudanças, o build passou e a suíte executou 60 testes, com 8 testes de hardware opcionais ignorados e nenhuma falha. A audição humana do controle individual continua pendente.
+
+A marca original da interface foi mantida como referência para o ícone do aplicativo e da barra de menus. Rótulos acessíveis foram adicionados aos controles de volume e silêncio; verificados na interface. Após uma interrupção durante troca de saída, a sessão do Opera foi reaberta no QCY e permaneceu ativa durante a observação curta; estabilidade prolongada continua pendente.
+
+Controle automático de aplicativos: opção em Settings, inicialmente desativada, inicia o controle dos aplicativos ativos; exclusões individuais e ativações manuais são persistidas. Teste com fonte real confirmou ativação automática, exclusão e retomada manual. Tentativas após falha agora são contadas separadamente por processo e saída.
+
+Persistência adicional verificada: o serviço recriado recupera a lista de aplicativos habilitados e respeita os excluídos sem iniciar captura de um aplicativo que não esteja ativo.
+
+Conforme pedido posterior, o controle automático agora começa ativado e abrange todos os aplicativos ativos; os botões individuais ficam ocultos nesse modo. No modo manual, as escolhas são persistidas. A suíte teve 63 testes, 8 opcionais ignorados, sem falhas; o teste optativo de captura real também passou.
+
+Teste de abertura posterior: com modo automático já ligado e sem ativação manual salva para a fonte de teste, um processo iniciado depois foi detectado e controlado; sua preferência de mute foi mantida. Teste de captura real passou no macOS.
+
+A ação de tentar novamente no modo automático foi separada da ativação manual, evitando alterar a preferência individual. Teste de captura com fonte real confirmou a recuperação sem gravar uma ativação manual.
+
+Por solicitação do usuário, o menu Applications foi removido por duplicar o Mixer; os controles permanecem no Mixer e na barra de menus.
+
+A tela Devices agora lista entradas e saídas reais em cartões, identifica o padrão e permite selecioná-lo. Interface conferida no macOS com o QCY, dispositivos internos e interface virtual; os padrões do usuário foram preservados durante a inspeção.
+
+O Mixer agora apresenta cada aplicativo em um cartão e identifica saídas incompatíveis no seletor por aplicativo. Rótulos acessíveis das listas de dispositivos distinguem entrada e saída. A interface foi conferida no macOS sem alterar a seleção do usuário.
+
+Perfis: um perfil inicial é criado quando necessário; o último é protegido contra exclusão. A seleção ativa aparece no Mixer e na barra de menus, é persistida e recebe automaticamente alterações de áudio; os demais perfis são preservados. Confirmação de exclusão e descrições dos botões foram adicionadas. Idiomas português e inglês foram adicionados, com escolha persistente ou detecção do idioma do sistema; outros idiomas usam inglês.
+
+Validação adicional no hardware: o volume real foi alterado no perfil ativo, permaneceu inalterado no outro perfil e foi restaurado corretamente ao alternar entre os dois; o volume original do Mac foi devolvido ao final.
+
+Após a implementação de perfil ativo, os testes de automação com evento Core Audio real e agendamento com dispositivos reais passaram novamente. O teste de troca com headset foi ignorado nesta execução porque o par físico não estava disponível; os ciclos físicos anteriores permanecem registrados acima.
+
+O perfil padrão passou a registrar também o estado inicial de silêncio da saída quando o dispositivo oferece esse controle. O teste correspondente falhou antes da correção e passou após ela; a compilação de produção passou.
+
+Corrigida compatibilidade de perfis antigos sem configurações de aplicativos: ao selecioná-los, o mixer usa os valores padrão em vez de herdar os ajustes do perfil anterior. Testes de isolamento passaram e o build foi atualizado.
+
+A atualização automática de perfis preserva valores temporariamente indisponíveis apenas enquanto a saída for a mesma. Ao mudar para uma saída sem controle de volume ou silêncio, o perfil não herda controles incompatíveis da saída anterior. Testes de política e build passaram.
+
+A descrição de permissão de áudio foi ajustada ao controle automático e localizada em português e inglês. O pacote declara inglês como idioma de desenvolvimento; arquivos de permissão e assinatura foram verificados após o build.
+
+Após as mudanças de perfis e idioma, o teste de Process Tap com 15 segundos de sinal na saída padrão passou: 1.402 callbacks, ganho medido próximo de 50%, sem underruns ou overruns; mute e retomada também foram exercitados. A observação não substitui audição nem uso prolongado.
+
+Os rótulos acessíveis dinâmicos de entrada, saída e silêncio por aplicativo passaram a acompanhar o idioma escolhido. O build de produção passou; a verificação com leitor de tela humano permanece pendente.
+
+A aplicação de perfis agora verifica se a saída oferece os controles de volume e silêncio exigidos antes de alterar dispositivos. Isso evita mudanças parciais previsíveis; falhas do sistema durante a troca ainda podem ocorrer. Testes de política e aplicação com dispositivos reais passaram, além do build.
+
+A verificação preventiva de perfis foi testada com dispositivo agregado privado real do macOS sem controle de volume: a aplicação foi recusada e os dispositivos padrão e o perfil ativo permaneceram iguais. O dispositivo de teste foi removido ao final.
+
+Dois processos de áudio reais foram testados simultaneamente com ganhos diferentes; silenciar um não alterou o sinal processado do outro. O teste remove seus processos e arquivos temporários ao final.
+
+Após recompilações sucessivas, os recursos de inglês e português no aplicativo foram comparados com os arquivos de origem e coincidem; a assinatura local do pacote também foi verificada. A assinatura é ad hoc e pode exigir nova permissão após novas compilações.
+
+Validação integrada posterior: uma execução ficou bloqueada em AudioDeviceStart e foi interrompida; os dispositivos padrão foram conferidos e permaneceram internos. Um aviso de espera após 15 segundos foi adicionado sem executar capturas duplicadas; os testes do worker cobrem demora e conclusão normal. O teste simultâneo passou isoladamente depois, mas a execução integrada seguinte teve falha na retomada da fonte após reinício (79 testes, 2 ignorados, 1 falha). Uma repetição limitada foi encerrada durante a compilação da fonte de teste, sem resultado conclusivo. A intermitência e a audição prolongada continuam pendentes. O teste simultâneo foi isolado em script com limite de tempo e limpeza de processos.
+
+Investigação da retomada: a fonte de teste usa reprodução em loop, então seu fim não explica a falha anterior. Com o Voltra principal temporariamente encerrado e fonte pré-compilada, o teste de captura, troca e reinício passou em 9,2 segundos; o aplicativo foi reaberto com a configuração anterior. Isso sugere, mas não prova, interferência entre instâncias ou diferença de carga. A suíte sem testes opcionais passou com 79 testes, 11 ignorados. A intermitência em execução integrada continua em aberto.
+
+
+### 14/11/2026 — assinatura e menu rápido
+
+- Assinatura “by CaffeeeLabs” no rodapé da navegação, usando a imagem original incluída no pacote. Prévia visual conferida; imagem do pacote comparada ao arquivo original e assinatura do aplicativo verificada.
+- Menu da barra superior usa a mesma lista e controles reais do Mixer, em versão compacta; seleção de saída individual continua na janela principal. O aplicativo mantém o processo ativo quando a última janela é fechada; encerramento explícito permanece no menu.
+- `swift test`: 79 testes, 11 omitidos por dependerem de integração opt-in, zero falhas. `./build-app.sh`: concluído. Em instância isolada, o processo permaneceu ativo após fechar a janela; a ferramenta de interface expirou ao tentar inspecionar a barra e a reabertura não foi verificada nesta rodada.
+- Teste anterior de três capturas simultâneas (`VOLTRA_OVERLAP_TEST=1 ./scripts/test-concurrent.sh`) passou; isso não elimina a falha intermitente previamente observada na retomada de captura.
+
+Investigação adicional de retomada em 14/11: com a instância principal fechada e uma fonte pré-compilada, quatro execuções consecutivas de `ProcessTapIntegrationTests` passaram em 6,7–6,8 s cada. Todas verificaram captura, ganho 50%, mute e retomada após reinício da fonte; cerca de 184–185 callbacks, sem underruns ou overruns no intervalo medido. O macOS registrou avisos de sandbox relacionados ao aplicativo temporário, mas os testes passaram. A falha anterior na suíte integrada não foi reproduzida e sua causa permanece desconhecida; os resultados não comprovam estabilidade prolongada nem funcionamento concorrente com outra instância.
+
+Automação por horário: a consulta considera o intervalo desde a última observação para recuperar a ocorrência mais recente após repouso, inclusive ao atravessar a meia-noite. Empates respeitam a prioridade existente; uma ocorrência já executada não provoca aplicação de regra anterior. O comportamento foi exercitado com relógio simulado; ainda não foi submetido a um ciclo físico de repouso. A recuperação cobre intervalos enquanto o Voltra permanece aberto, não períodos em que está encerrado. `swift test`: 82 testes, 11 opcionais omitidos, nenhuma falha.
+
+Validação integrada da retomada: o teste existente revelou regressão ao criar uma regra durante seu minuto; a consulta agora inclui o minuto corrente e o teste voltou a passar. Novo teste com serviço e dispositivos reais, usando relógio simulado e preferências isoladas, confirmou aplicação única do perfil mais recente após intervalo. Não foi feito repouso físico. Suíte: 83 testes, 12 opcionais omitidos, zero falhas. Build de produção concluído.
+
+O README foi atualizado para refletir a recuperação de automações após repouso e diferenciar o teste de relógio simulado de um repouso físico. A prévia isolada confirmou a janela e foi encerrada; a ferramenta de interface não expôs os ícones da barra de menus, portanto a reabertura por esse ícone continua sem confirmação visual nesta sessão.
+
+Teste adicional de perfis: saídas individuais diferentes foram salvas em dois perfis, restauradas ao alternar e conferidas após recriar o serviço. O teste usa identificadores fictícios para verificar persistência e isolamento, não reprodução física nessas saídas. Suíte: 84 testes, 12 opcionais omitidos, nenhuma falha.
+
+Validação de horários sazonais: testes em America/New_York confirmaram que uma hora inexistente não é inventada e uma hora repetida não executa a mesma regra duas vezes no mesmo dia. Arquivos de tradução passaram em `plutil -lint`. Suíte: 86 testes, 12 opcionais omitidos, nenhuma falha.
+
+Correção de feedback de captura: quando uma inicialização demorada termina ou é cancelada, o aviso de espera associado é removido; um erro posterior de outra origem é preservado. Testes verificam a propriedade do aviso e a conclusão tardia do worker. Suíte: 87 testes, 12 integrações opcionais omitidas, nenhuma falha; build de produção concluído. A causa do bloqueio intermitente do Core Audio continua em investigação.
+
+Investigação de captura integrada: no mesmo processo de testes, `ConcurrentTapIntegrationTests` passou com duas fontes simultâneas e, em seguida, `ProcessTapIntegrationTests` passou com captura, ganho, mute e reinício da fonte (185 callbacks, zero underruns/overruns no intervalo de diagnóstico). O macOS emitiu avisos de sandbox para o aplicativo temporário apesar do sucesso. O teste não reproduziu a falha integrada anterior nem identifica sua causa; não comprova estabilidade prolongada.
+
+Fila de captura: inicializações substituídas enquanto aguardam agora são descartadas antes de chamar o Core Audio. Teste do worker confirmou que a tarefa obsoleta é ignorada e a seguinte executa; a suíte teve 88 testes, 12 opcionais omitidos, sem falhas. O teste real de Process Tap também passou após a mudança (184 callbacks, zero underruns/overruns no intervalo medido; macOS registrou avisos de sandbox do aplicativo temporário). Build de produção concluído. A mudança não cancela uma chamada de sistema já bloqueada nem identifica a causa da intermitência anterior.
+
+Após a alteração da fila, o teste Process Tap de 15 segundos passou nos alto-falantes internos: 1.404 callbacks, ganho medido de 50%, sem underruns/overruns na janela medida; o teste também passou por mute e reinício. O sistema registrou avisos de sandbox para o aplicativo temporário. Quinze segundos não demonstram audição, latência ou estabilidade prolongada.
+
+Troca automática: a política preserva o dispositivo interno atual enquanto o preferido estiver ausente, evitando alternâncias causadas por reordenação da lista; o preferido continua tendo prioridade ao retornar. Teste de política cobre duas ordens e reconexão; evento real de dispositivo Core Audio passou. Suíte: 89 testes, 12 opcionais omitidos, nenhuma falha; build concluído. O cenário de múltiplos dispositivos internos foi simulado.
+
+Interface: setas de prioridade receberam rótulos explícitos de acessibilidade e a descrição de agendamentos foi alinhada ao comportamento após repouso, em português e inglês. Arquivos de idioma passaram em `plutil -lint`; build concluído. A leitura por VoiceOver ainda não foi verificada por uma pessoa.
+
+Interface verificada em cópia isolada: perfil padrão protegido, criação de segundo perfil, confirmação e cancelamento da exclusão, exclusão confirmada e retorno ao perfil padrão; troca de português para inglês refletida na interface. Corrigido texto de Settings que indicava controle automático mesmo quando desligado; tradução em inglês validada com `plutil` e build concluído.
+
+Investigação de saídas duplex: documentação pública da Apple descreve AUHAL com entrada desabilitada e saída separada, uma alternativa para investigar o isolamento do microfone. O caminho exige sincronização entre callbacks e validação com dispositivos; não foi implementado, e a recusa de saídas duplex permanece. Referências e critérios estão em VALIDACAO.md.
+
+Experimento AUHAL: uma unidade configurada apenas para saída iniciou na saída virtual duplex, manteve a propriedade de entrada desabilitada e executou callbacks de silêncio sem mudar padrões. Não demonstra isolamento físico nem implementa transporte de áudio. Suíte normal: 90 testes, 13 opcionais omitidos, nenhuma falha; teste exploratório passou separadamente.
+
+Experimento duplex: adicionado buffer estéreo de produtor/consumidor com operações atômicas e silêncio em falta de dados, ainda sem ligação ao Mixer. Testes cobrem limite, retorno ao início e 10 mil quadros entre filas concorrentes. Não há correção de deriva nem conversão de taxa; o componente não habilita suporte duplex. Suíte: 92 testes, 13 opcionais omitidos, zero falhas; build concluído.
+
+Experimento integrado duplex: sinal de fonte nativa atravessou tap, agregado de captura, buffer e callback AUHAL em saída virtual; ganho de 50% medido e entrada da AUHAL lida como desabilitada. Foi um teste curto, não prova saída audível nem segurança do microfone físico, e o caminho continua fora do Mixer. Suíte: 93 testes, 14 opcionais omitidos, zero falhas.
+
+Experimento duplex ampliado: após 1 segundo de estabilização, 4 segundos de transferência à saída virtual registraram zero quadros faltantes ou descartados, 470 callbacks, ganho de 50% e mute no callback; propriedade de entrada da AUHAL permaneceu desativada. Buffer ganhou contadores atômicos testados. Isso não prova estabilidade de longo prazo, taxas diferentes ou isolamento físico; o caminho não está no Mixer. Suíte: 94 testes, 14 opcionais omitidos, zero falhas; build concluído.
+
+Ponte duplex experimental: execução com 20 segundos medidos após estabilização passou em saída virtual; 1.969 callbacks, ganho 50%, mute e zero quadros faltantes/descartados no intervalo. O teste usa taxa de 48 kHz e não cobre deriva de longo prazo, diferentes taxas, mudanças de dispositivo ou microfone físico; continua fora do produto.
+
+Ponte duplex experimental: após terminar a fonte, o callback de saída retornou silêncio; as chamadas de parada e descarte da AUHAL, callback, agregado e tap retornaram sucesso. O teste usou saída virtual e continua fora do Mixer; não comprova isolamento de microfone físico nem comportamento durante desconexão de hardware.
+
+Ponte duplex extraída para `DuplexProcessTap`, ainda sem seleção pelo serviço: agregado apenas de tap, AUHAL de saída com entrada desabilitada, buffer e ganho; rejeita taxas diferentes. Teste virtual usando o componente passou com ganho, mute, parada da fonte e zero perdas em quatro segundos após estabilização. Suíte: 94 testes, 14 opcionais omitidos, nenhuma falha; build concluído. Falta validar ciclo de vida sob falhas/desconexões, deriva e isolamento físico antes da integração.
+
+Ponte duplex experimental: formato do tap e formato real do único fluxo de entrada do agregado são verificados antes de iniciar; formatos planares, big-endian, mono ou taxas divergentes são recusados. Teste virtual passou com 470 callbacks e zero perdas na janela medida; suíte teve 95 testes, 14 opcionais omitidos, zero falhas; build concluído. Caminho ainda não integrado nem validado em hardware físico.
+
+Ponte duplex experimental: limpeza registra falhas das chamadas do sistema e, se houver falha, mantém a memória de callbacks por precaução. Teste normal com saída virtual confirmou limpeza sem erro, porém não simulou falha do sistema. Duas execuções via swift test expiraram sem indicar início do XCTest; execução direta do XCTest passou, portanto não foi identificada a etapa da demora. Suíte direta: 95 testes, 14 opcionais omitidos, nenhuma falha; build concluído.
+
+Taxas da ponte experimental: a saída virtual Microsoft Teams Audio anuncia apenas 48 kHz. Uma AUHAL nessa saída aceitou formato de cliente 44,1 kHz, iniciou e solicitou buffers com entrada desativada; o padrão do sistema não mudou. O teste forneceu silêncio e não mediu conversão de sinal ou deriva; não habilita taxas diferentes na ponte.
+
+Ponte duplex: medições mostraram perdas esperadas na partida (2.048 a 6.656 quadros nos ensaios) e nenhuma perda posterior na janela observada. Adicionado monitor experimental com linha de base após a tolerância inicial; testes cobrem detecção de perda posterior e sessão virtual. O monitor ainda não está integrado ao AudioService. Suíte: 96 testes, 14 opcionais omitidos, nenhuma falha; build concluído.
+
+Integração isolada da ponte duplex ao AudioService, habilitada apenas por parâmetro de teste: teste real roteou aplicativo para saída virtual duplex, mediu ganho 50% e mute, retornou à saída padrão e confirmou retomada. A primeira execução identificou expectativa inconsistente no próprio teste (volume alterado de 30% para 50%); após restaurar o valor, passou. O modo padrão do produto ainda recusa saídas duplex físicas e virtuais. Suíte: 96 testes, 14 opcionais omitidos, zero falhas; build concluído.
+
+Ponte duplex via AudioService: ao selecionar um UID inexistente, o serviço parou a sessão sem redirecionar para outra saída; ao selecionar novamente a saída virtual duplex, retomou e preservou mute. O teste também retornou à saída padrão e passou. A indisponibilidade foi simulada por UID, não por desconexão física; o caminho experimental continua desativado no produto.
+
+Saídas virtuais duplex compatíveis foram habilitadas para controle por aplicativo via AUHAL de saída com entrada desabilitada; o seletor as apresenta como opções. Saídas físicas duplex continuam recusadas. Teste de integração com Microsoft Teams Audio verificou roteamento, ganho, mute, indisponibilidade simulada e retorno; suíte: 97 testes, 14 opcionais omitidos, nenhuma falha; build concluído. A validação auditiva e outros drivers virtuais continuam pendentes.
+
+Interface do Mixer em cópia isolada: o seletor de saída por aplicativo apresentou Microsoft Teams Audio como opção habilitada, ao lado da saída do Mac e do padrão do sistema. A lista foi inspecionada sem selecionar a saída nem ativar captura do aplicativo do usuário; a prévia e a fonte silenciosa foram encerradas.
+
+Limpeza da ponte virtual: teste em saída virtual passou com encerramento normal e com falha de retorno simulada após as chamadas reais. Na falha simulada, o erro permaneceu registrado e o contexto foi preservado mesmo após nova tentativa de stop; isso não reproduz um driver realmente travado. Suíte: 97 testes, 14 opcionais omitidos, nenhuma falha; build concluído.
+
+Saída virtual duplex: teste de 45 segundos medidos após estabilização passou com 4.313 callbacks, ganho 50%, mute e zero quadros faltantes/descartados no intervalo. O dispositivo permaneceu em 48 kHz e a entrada da AUHAL desabilitada; o teste não comprova audição, outros drivers nem estabilidade em sessões prolongadas.
+
+Saída virtual duplex pelo AudioService: teste de estabilidade manteve a sessão controlada por 12 segundos com consultas de saúde e temporizador de dez segundos, depois verificou mute, saída indisponível simulada e retomada. O teste passou; o macOS registrou avisos de sandbox para a fonte temporária. Não substitui audição ou teste de longa duração.
+
+Preparado teste físico de isolamento com agregado privado contendo alto-falante e microfone internos, AUHAL apenas de saída e consulta de atividade do microfone. A execução foi ignorada antes de criar o agregado porque o microfone já estava em uso; nenhuma conclusão sobre isolamento físico foi obtida. Suíte: 98 testes, 15 opcionais omitidos, nenhuma falha.
+
+Segurança da ponte virtual: se o sistema não confirmar a limpeza, novas sessões do mesmo aplicativo são bloqueadas até reiniciar o Voltra; o Mixer explica a ação necessária. Teste integrado simulou falha após limpeza real e confirmou que uma retomada já enfileirada não começa; fluxo normal de troca também passou. A simulação não reproduz driver travado. Suíte: 98 testes, 15 opcionais omitidos, nenhuma falha; build concluído.
+
+### Proteção de limpeza das sessões de áudio
+
+A limpeza das sessões comuns e duplex verifica falhas e impede a retomada do aplicativo afetado até reiniciar o Voltra. Testes de integração exercitaram a sessão comum e o serviço com falhas simuladas; não representam uma falha real do driver. A suíte executou 98 testes, com 15 testes opcionais ignorados e nenhuma falha. Permanecem pendentes a validação auditiva e de estabilidade prolongada, a investigação da inicialização intermitente do Core Audio e a validação de dispositivos físicos duplex.
+
+O caminho padrão de Process Tap agora recusa formatos PCM incompatíveis com o processamento de Float nativo (incluindo big-endian, planar, pacotes incompatíveis e taxas não finitas). O teste de política e a captura real na saída atual passaram: 185 callbacks, ganho aproximado de 50% e sem underruns/overruns na janela observada. A suíte executou 99 testes, com 15 opcionais ignorados e nenhuma falha. O teste físico de isolamento foi novamente ignorado porque o microfone estava em uso; não houve interrupção do usuário.
+
+O Process Tap padrão agora recusa taxas diferentes entre os fluxos reais de entrada e saída: o DSP copia quadros e ainda não faz conversão de taxa. O teste reproduziu a aceitação incorreta de 44,1/48 kHz antes da alteração; suporte por conversão permanece pendente. A captura real na saída atual passou após a alteração (186 callbacks, ganho de 50%, sem perdas medidas); a suíte teve 100 testes, 15 opcionais ignorados e nenhuma falha.
+
+Investigação de taxa: na saída virtual Microsoft Teams Audio (48 kHz), a AUHAL configurada com cliente 44,1 kHz solicitou cerca de 43.028 quadros/s em dois segundos, com entrada desabilitada; o teste usou silêncio e incluiu partida/parada no tempo medido. Não valida sinal convertido, qualidade, deriva ou execução prolongada. O teste físico de isolamento foi novamente ignorado com microfone em uso. README e matriz de validação registram que o caminho padrão ainda não converte taxas diferentes.
+
+Conversão de taxa: teste offline com AVAudioConverter preservou um sinal estéreo de 440 Hz e um segundo nas conversões 44,1 → 48 kHz e 48 → 44,1 kHz (48.000/44.100 quadros, 439,69/440,11 Hz). O teste não abre dispositivos, não valida o callback em tempo real nem habilita conversão no produto.
+
+Internacionalização: o indicador de etapas do onboarding deixou de fixar “DE 6” em português e recebeu “OF 6” em inglês. Os arquivos de tradução passaram em plutil, a suíte executou 101 testes com 15 opcionais ignorados e nenhuma falha, e o build de produção foi concluído. A conversão de taxa no caminho em tempo real continua pendente.
+
+Taxas diferentes na ponte: um agregado privado manteve seu fluxo a 44,1 kHz durante captura sem alterar o padrão. Foi adicionado parâmetro experimental de teste para alimentá-lo à AUHAL de uma saída virtual de 48 kHz; não é usado pelo AudioService. Com tom conhecido, ganho e mute funcionaram no callback, mas ensaios de quatro segundos registraram 6 e 3 quadros faltantes após a estabilização; um ensaio de 20 segundos registrou zero. Os dois testes curtos falharam pelo critério de zero perdas. A causa e o áudio após a saída virtual permanecem sem comprovação; taxas diferentes continuam desativadas no produto. Suíte normal: 102 testes, 16 opcionais omitidos, nenhuma falha.
+
+Ponte com taxas diferentes: instrumentação observou ocupação mínima de 3 quadros no ensaio com perdas. Uma pré-carga experimental de 2.048 quadros, desativada no produto, manteve margem e não registrou perdas em três ensaios de 4 segundos e um de 20 segundos; no mais longo a ocupação observada variou de 1.091 a 2.057 quadros. A pré-carga adiciona aproximadamente 46 ms a 44,1 kHz; não corrige necessariamente deriva entre relógios e o som após a saída virtual ainda não foi medido. Suíte: 103 testes, 16 opcionais ignorados, nenhuma falha.
+
+Pré-carga experimental: ensaio de 60 segundos com captura a 44,1 kHz e saída virtual a 48 kHz passou com 5.716 callbacks, zero quadros faltantes/descartados e ocupação amostrada entre 1.370 e 2.343 quadros. Ganho 50%, mute, silêncio após término da fonte e entrada AUHAL desabilitada foram verificados no callback. Não mede o sinal após a saída, audição, latência total nem deriva de longo prazo; não habilita o recurso no produto.
+
+A pré-carga de 2.048 quadros foi habilitada para a ponte virtual já usada pelo AudioService. O ensaio reproduziu 1.024 quadros faltantes na partida antes da mudança e passou com zero depois, mantendo ganho, mute e limpeza; o teste integrado do serviço também passou por 12 segundos, troca de saída, indisponibilidade simulada e retomada. Ela adiciona cerca de 43 ms a 48 kHz, além da latência do dispositivo. A conversão entre taxas diferentes continua experimental e a saída física duplex continua bloqueada.
+
+Barra de menus: cópia isolada com controle automático desligado abriu o Mixer sem interferir nas preferências do usuário. Após a tentativa de fechar a janela, a ferramenta de interface expirou e não confirmou visualmente o fechamento nem a reabertura pela barra; o processo da cópia ainda aparecia ativo. Cópia e preferências temporárias foram removidas e o processo de teste encerrado. A validação de reabertura permanece pendente.
+
+Perfis com áudio real: teste integrado em preferências isoladas alternou uma fonte entre a saída padrão e a virtual com ganhos de 25% e 50%; alterou o perfil ativo para 35%, confirmou que o outro permaneceu em 50% e verificou a restauração dos 35% e da saída ao retornar. A medição foi feita nos callbacks, não por audição. O microfone estava em uso e o teste físico de isolamento foi ignorado.
+
+Reconexão por aplicativo: uma tentativa de simular desconexão com agregado privado aninhado não chegou à reconexão. A mensagem original indicou múltiplos fluxos, mas a inspeção posterior mostrou que o agregado não expôs nenhum fluxo de saída. A mensagem foi corrigida para distinguir ausência, múltiplos fluxos e lista inválida; o teste registra skip apenas para a ausência observada. Os padrões permaneceram microfone e alto-falantes internos. O cenário de reconexão com uma saída compatível continua pendente.
+
+O diagnóstico de fluxo de saída foi coberto por teste de zero, um, múltiplos e tamanho inválido; a tentativa real confirmou a mensagem de ausência. A tradução inglesa foi adicionada.
+
+Recuperação de rota por aplicativo: teste com sessões reais e preferências isoladas ocultou e restaurou na descoberta o mesmo UID de saída, primeiro nos alto-falantes internos e depois no dispositivo virtual duplex. Nos dois caminhos, o serviço encerrou a sessão ao ficar indisponível, preservou a saída selecionada e retomou com mute e volume mantidos. A indisponibilidade foi simulada por filtro de descoberta; não houve desconexão física nem alteração dos dispositivos padrão.
+
+Reconexão: a identidade da sessão passou a incluir o AudioObjectID além do UID persistente. Se o macOS recriar uma saída com o mesmo UID e outro objeto, a política solicita uma nova sessão e reinicia o limite de tentativas. O caso foi simulado em teste de política; o teste real de recuperação por visibilidade nos caminhos interno e virtual também passou. Não foi feita desconexão física para confirmar esse caso específico. Suíte: 105 testes, 16 opcionais ignorados, nenhuma falha.
+
+Reconexão com mesmo UID: teste integrado simulou a mudança do AudioObjectID usado na comparação enquanto manteve a saída física conectada. O serviço desmontou e recriou a sessão real e preservou o mute; o sinal foi medido no callback. Isso não representa desconexão física nem prova que o driver recrie o ID em determinada reconexão.
+
+Verificação adicional da ponte: Process Tap privado limitado ao próprio processo de teste capturou o sinal da AUHAL virtual em 48 kHz. Com entrada da ponte a 44,1 kHz e ganho de 50%, a amostra medida teve frequência aproximada de 441,5 Hz e RMS 0,01294 para um tom de 440 Hz; um ensaio anterior mediu 438,5 Hz. A ponte com taxas iguais também passou. Isso observa o áudio do processo, não garante audição, entrega física ou estabilidade prolongada; a conversão de taxa continua experimental.
+
+Negociação de taxa integrada à ponte virtual: a AUHAL usa a taxa do fluxo de captura e confirma o formato aceito, permitindo taxas diferentes quando o driver suporta. Ensaio com captura privada forçada em 44,1 kHz e saída virtual 48 kHz passou por 20 segundos sem perdas e com tom medido em Process Tap do próprio processo; pelo AudioService passou por 12 segundos, mute e retomada após indisponibilidade simulada. Não valida audição, outros drivers, deriva prolongada ou saídas físicas duplex.
+
+Ponte virtual com taxas diferentes: Process Tap limitado ao próprio processo observou sinal a 48 kHz com entrada a 44,1 kHz, pico 0,0183; ao silenciar, pico zero; ao reativar, pico 0,0183. A medição ocorreu no áudio do processo de teste, não na saída física ou por audição.
+
+Caminho padrão: teste de Process Tap com fonte própria nos alto-falantes internos manteve o sinal silenciado por 60 segundos, confirmou presença na captura e silêncio na saída, depois ganho de 50% e mute. Foram observados 5.661 callbacks e zero underruns/overruns. O teste verifica o callback, não audição ou latência; estabilidade além desse intervalo continua sem prova.
+
+Caminho padrão: um Process Tap privado limitado ao próprio processo de teste observou a saída produzida pelo agregado nos alto-falantes internos. O pico foi 0,03051 com ganho de 50%, zero ao silenciar e 0,03051 após reativar. Não houve captura de microfone ou de outros aplicativos. Isso não substitui audição ou prova de entrega física.
+
+Isolamento entre aplicativos: duas fontes reais com tons de 440 e 880 Hz foram processadas simultaneamente e observadas por Process Tap limitado ao processo de teste. As amplitudes medidas foram 0,00911 e 0,02744; ao silenciar a primeira, 0,000067 e 0,02745; após reativar, 0,00911 e 0,02744. A medição ocorreu no áudio do processo, não por audição ou captura do microfone.
+
+Isolamento físico: após sair da aba Entrada dos Ajustes do Sistema, o microfone interno ficou livre. Um agregado privado com alto-falante e microfone internos manteve a entrada AUHAL desativada, mas o indicador Core Audio do microfone passou a 1 após iniciar a saída e ainda estava em 1 imediatamente após parar; depois da limpeza voltou a 0. O teste falhou no critério de isolamento. Como controle, AUHAL diretamente no alto-falante interno manteve o microfone em 0. O experimento usa agregado de dispositivos separados, não um headset físico duplex nativo; não prova leitura de amostras pelo app. A restrição para saídas físicas duplex permanece.
+
+Isolamento físico adicional: em agregado privado com alto-falante e microfone internos, o IOProc foi configurado com o único fluxo de entrada desativado; a leitura de volta confirmou zero, mas o indicador de atividade do microfone passou a 1 durante AudioDeviceStart e voltou a 0 após AudioDeviceStop. O teste falhou no critério de isolamento. A configuração não leu amostras da entrada. A restrição de dispositivos físicos duplex permanece; o resultado não generaliza para todos os drivers.
+
+Validação auditiva: a versão atual foi aberta no Mixer em português; não havia aplicativo com áudio ativo. O perfil ativo restaurou o volume de saída para aproximadamente 50% (antes da abertura estava em cerca de 62%). Foi solicitada confirmação auditiva de redução, mute e retomada; nenhuma resposta foi recebida nesta etapa. O aplicativo permaneceu aberto.
+
+Histórico de automações: novas falhas conhecidas de aplicação de perfil guardam uma chave de tradução, permitindo exibir o detalhe no idioma atual; registros antigos e erros sem chave mantêm o texto original. Testes cobrem compatibilidade e uma regra real com perfil indisponível. Suíte: 108 testes, 16 opcionais ignorados, zero falhas. Build release passou; pacote candidato assinado em build/voltra-candidate-x7pedkbn/Voltra.app. O pacote principal em execução não foi substituído durante a validação auditiva pendente.
+
+Histórico de automações: detalhes conhecidos com código Core Audio agora persistem a chave e o código, para formatar no idioma atual. Testes cobrem código negativo e leitura de registros antigos; falhas sem metadados continuam no texto original. Suíte: 109 testes, 16 opcionais ignorados, zero falhas. Build release e assinatura do pacote candidato build/voltra-candidate-5ulfvm1a/Voltra.app passaram; o aplicativo aberto para audição não foi substituído.
+
+Preferências de controle por aplicativo: registros antigos sem todos os campos preservam a seleção manual; registros inválidos recebem cópia de segurança e recuperação com controle automático desligado, com aviso localizado. Instalações novas continuam com controle automático ligado. Testes em preferências isoladas passaram; suíte: 111 testes, 16 opcionais ignorados, nenhuma falha. Build release e pacote candidato build/voltra-candidate-7re7eo6v/Voltra.app assinados localmente e verificados, sem substituir o aplicativo aberto.
+
+Build isolado: build-app.sh aceita VOLTRA_BUILD_OUTPUT para gerar um pacote separado sem substituir a versão aberta. O teste gerou build/candidato-teste-d19bdce2/Voltra App.app, inclusive em caminho com espaços; assinatura e recursos de idioma foram verificados e o processo do pacote principal permaneceu ativo.
+
+Detecção na interface: uma fonte temporária própria reproduzindo silêncio apareceu como Voltra Silent Test no Mixer da versão principal aberta, mas permaneceu com o aviso de que o macOS ainda não concluiu a inicialização do áudio. A fonte foi encerrada e removida. A detecção foi observada; a ativação da sessão, o controle e a audição não foram comprovados por esse ensaio. O pacote principal aberto não é o candidato mais recente.
+
+Diagnóstico da espera na interface: uma segunda fonte temporária silenciosa permaneceu ativa por 22 segundos; amostragem do processo do pacote principal em execução mostrou a thread de trabalho em AudioDeviceCreateIOProcIDWithBlock, aguardando resposta por mensagem Mach em HALC_ProxyIOContext::_TellServerAboutStreamUsage. A fonte foi encerrada e removida. A amostra identifica a chamada bloqueada, não a causa da demora; não houve verificação equivalente do pacote candidato nem prova de reprodução audível.
+
+Diagnóstico complementar do Core Audio: um processo independente registrou e removeu um IOProc diretamente na saída padrão, sem iniciar a saída nem reproduzir áudio; leitura do dispositivo, registro e remoção retornaram status 0. A amostra anterior bloqueou no registro de IOProc do agregado que contém o Process Tap; esta comparação não determina a causa. A inspeção do coreaudiod foi recusada pelo sistema por falta de privilégios, sem tentativa de elevação. A documentação pública da Apple descreve a chamada e a permissão, mas não explica a espera observada.
+
+Diagnóstico com controles isolados: um processo independente criou um agregado privado apenas com a saída padrão, registrou e destruiu seu IOProc e destruiu o agregado, tudo com status 0, sem iniciar o dispositivo. Em seguida outro processo criou um tap privado com lista vazia e um agregado com a mesma saída; ambas as criações retornaram 0, mas o registro do IOProc não retornou em 25 segundos e o processo foi encerrado pelo limite. Não foi iniciada captura nem reprodução. Este ensaio reproduz a espera na combinação agregado/tap fora do Voltra, mas lista de processos vazia difere do cenário de aplicativo real e a causa permanece desconhecida.
+
+Espera prolongada: a mensagem de inicialização agora orienta reiniciar o Voltra se a espera persistir, em português e inglês. É orientação de recuperação, não correção do bloqueio do Core Audio nem garantia de que reiniciar resolverá. Suíte: 111 testes, 16 ignorados, nenhuma falha; pacote release separado em build/voltra-recovery-message/Voltra.app. O pacote em execução não foi substituído.
+
+Início automático do tap: registros do coreaudiod mostraram a criação do contexto do tap antes da espera, mas não identificaram a causa. Um novo processo independente repetiu o teste de agregado com tap privado e lista vazia com kAudioAggregateDeviceTapAutoStartKey desativado; tap e agregado retornaram status 0, enquanto o registro do IOProc também excedeu 25 segundos. Não foram iniciadas captura ou reprodução. Esse resultado não sustenta que apenas a opção de início automático explique a espera; a lista vazia continua uma diferença em relação ao caso de uso real.
+
+Investigação de autorização: o log TCC do macOS registra, no momento da espera do pacote principal, incompatibilidade entre o requisito de assinatura armazenado e a assinatura atual de com.voltra.local, seguida de AUTHREQ_PROMPTING para gravação de áudio do sistema. Não foi encontrado no mesmo identificador de solicitação um resultado no intervalo consultado; nenhuma caixa de autorização estava visível na janela do Voltra após o encerramento da fonte. Isso sugere uma solicitação pendente ou não concluída, mas não prova sua relação causal com todos os bloqueios. Foi solicitado ao usuário verificar a permissão nos Ajustes; nenhuma permissão foi alterada pelo teste.
+
+Assinatura de desenvolvimento: build-app.sh aceita VOLTRA_SIGN_IDENTITY para selecionar explicitamente uma identidade do chaveiro, mantendo assinatura ad hoc como padrão. Um ensaio com substitutos locais verificou os argumentos padrão e com nome contendo espaços, sem usar chave privada; assinatura real por certificado e permanência da autorização TCC entre builds ainda não foram validadas. O README descreve o uso e suas limitações.
+
+Assinatura de desenvolvimento real: pacote isolado em build/voltra-signed-development/Voltra.app assinado com a identidade pessoal Apple Development disponível; codesign --verify --deep --strict passou. Uma cópia temporária com CFBundleVersion modificado foi assinada com a mesma identidade e também passou na verificação; as duas têm o mesmo requisito designado, sem depender de cdhash. Isso não verifica nem altera a permissão TCC, nem comprova manutenção da autorização entre execuções, distribuição ou notarização. O pacote principal aberto não foi substituído.
+
+Permissão no painel do macOS: em Privacidade e Segurança > Gravação da Tela e do Áudio do Sistema, Voltra aparece ativado em Somente Gravação de Áudio do Sistema. Nenhuma configuração foi alterada. Como o log TCC registrou incompatibilidade de assinatura para o pacote em execução, a chave visual ligada não prova que a autorização armazenada corresponda à assinatura desse build nem resolve a solicitação observada.
+
+Pacote assinado na interface: sem aplicativos com áudio ativo, a versão anterior foi encerrada e o pacote de desenvolvimento assinado foi aberto. Uma fonte temporária silenciosa apareceu no Mixer, mas ficou aguardando a inicialização após 15 segundos; foi encerrada e removida. O log TCC registrou incompatibilidade do requisito de assinatura existente também para essa identidade, em consulta preflight. A troca de assinatura por si só não resolveu a sessão nem valida o controle; nenhuma permissão foi alterada. O pacote assinado ficou aberto, com os dispositivos e volume mostrados inalterados.
+
+Renovação de autorização e teste na interface: após autorização do usuário, com o botão Remover desabilitado mesmo após encerrar o app, foi executado tccutil reset AudioCapture com.voltra.local, limitado ao serviço e ao identificador do Voltra. O pacote assinado foi reaberto e uma fonte própria silenciosa detectada automaticamente passou a mostrar controles individuais; o slider foi reduzido de 100% para 90% e o botão de mute mudou para reativação. A fonte foi encerrada e seus arquivos removidos. Isso confirma inicialização e resposta visual nessa tentativa, não comprova captura de sinal, audição, concessão persistente da permissão, nem resolução definitiva da intermitência.
+
+Confirmação da autorização renovada: após o reset e o teste da fonte silenciosa, o painel do macOS mostrou Voltra ativado em Somente Gravação de Áudio do Sistema. O log TCC da mesma solicitação do pacote assinado registrou solicitação, resultado authValue=2 e resposta. A observação confirma o estado após a tentativa, não a manutenção da permissão entre builds nem o resultado audível do mixer.
+
+Menu superior: a lista compacta agora reserva 240 pontos quando há aplicativos com áudio e 70 quando está vazia, mantendo rolagem. Um teste isolado de layout SwiftUI mostrou que o limite máximo anterior podia produzir altura insuficiente; a correção não foi verificada visualmente no MenuBarExtra porque a automação de aplicativos nativos estava indisponível. Suíte: 111 testes, 16 ignorados, zero falhas; pacote assinado em build/voltra-menu-fix/Voltra.app. A versão em execução não foi substituída. A lista continua mostrando processos com áudio ativo, não todos os aplicativos apenas abertos.
+
+Conferência após o ajuste do menu: a versão assinada anterior em execução mostrava Opera GX com áudio ativo e controle individual no Mixer. A inspeção do SystemUIServer expirou, e não se reiniciou o app durante a reprodução; o pacote com ajuste de altura continua sem confirmação visual na barra superior.
+
+Teste de layout compacto: NSHostingView com preferências isoladas simula um app ativo e verifica espaço vertical para seus controles. Com o layout antigo o teste falhou (diferença de 65 pontos; mínimo esperado 150); com a correção passou. Suíte: 112 testes, 16 ignorados, nenhuma falha. É um ensaio de dimensionamento fora do MenuBarExtra real e não substitui validação visual no menu.
+
+Assinatura do ajuste do menu: codesign --verify --deep --strict passou para o pacote assinado aberto e o pacote com a correção; seus requisitos designados são iguais. Isso favorece a continuidade da identidade, mas a autorização TCC entre os dois pacotes ainda não foi exercitada. O Opera GX continuava com áudio ativo durante a conferência, então o aplicativo em execução não foi reiniciado.
+
+Exibição de porcentagem: valores de volume geral, por aplicativo e no perfil são arredondados ao inteiro mais próximo, evitando exibir 49% para um valor interno próximo de 50%. O pacote assinado build/voltra-menu-fix/Voltra.app foi reconstruído; não houve troca da instância em reprodução.
+
+Após o arredondamento de porcentagens: suíte com 112 testes, 16 ignorados e nenhuma falha; codesign --verify --deep --strict passou para o pacote voltra-menu-fix. A confirmação visual do menu e a troca da instância permanecem pendentes.
+
+Após autorização do usuário, a instância anterior foi encerrada e build/voltra-menu-fix/Voltra.app aberto. O Mixer mostrou Opera GX ativo com volume individual, e os percentuais arredondados apareceram. A consulta recente ao log TCC não retornou nova mensagem de incompatibilidade ou solicitação de autorização para o Voltra no intervalo. A tentativa de inspecionar o Control Center expirou; o popover real da barra superior ainda não foi verificado.
+
+Menu compacto e instalador: todo o painel passou a ter uma única área rolável limitada à altura disponível. Teste NSHostingView com 12 apps confirmou conteúdo maior que a área visível e movimento até o fim; não é uma verificação visual do MenuBarExtra real nem prova física de audição. A suíte executou 113 testes, 16 ignorados e nenhuma falha. build-installer.sh gerou DMG de desenvolvimento assinado com Apple Development; checksum, conteúdo, atalho para /Applications e assinatura do app montado foram verificados. O DMG não é notarizado nem pronto para distribuição ampla.
