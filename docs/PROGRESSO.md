@@ -324,3 +324,5 @@ Comportamento solicitado para chamadas: aplicativos detectados com entrada ativa
 Chamada de teste real: a versão atualizada mostrou WhatsApp com a orientação para usar o volume geral e sem slider individual, tanto no Mixer quanto no painel compacto. A instância anterior foi encerrada a pedido do usuário e a instância atual permaneceu aberta. A verificação visual não comprova, por si só, a audibilidade ou o comportamento após encerrar a chamada.
 
 O usuário confirmou que ouve a chamada normalmente ao ajustar o volume geral na versão atualizada. A retomada automática do controle individual após o fim da chamada ainda não foi verificada nesta sessão.
+
+Após o término da chamada, o usuário informou que testou a retomada do controle e que estava funcionando. O teste foi relatado pelo usuário; não houve medição automatizada do sinal nessa etapa.
