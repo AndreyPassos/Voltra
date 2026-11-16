@@ -1,0 +1,15 @@
+files = [defines["app"]]
+symlinks = {"Applications": "/Applications"}
+background = "Resources/installer-background.png"
+format = "UDZO"
+filesystem = "HFS+"
+window_rect = ((180, 160), (720, 460))
+icon_size = 112
+text_size = 14
+icon_locations = {"Voltra.app": (205, 266), "Applications": (515, 266)}
+show_status_bar = False
+show_tab_view = False
+show_toolbar = False
+show_sidebar = False
+show_pathbar = False
+default_view = "icon-view"

@@ -2,6 +2,8 @@
 
 From the repository root, run `sh scripts/build-site.sh` after generating the DMG with `./build-installer.sh`. The deployable directory is `build/site`. It includes the page, its assets, the installer and a SHA-256 checksum.
 
+The installer builder requires Python 3 and `dmgbuild==1.6.5` (`python3 -m pip install dmgbuild==1.6.5`). Set `VOLTRA_SIGN_IDENTITY` to the intended signing identity when building the application. To package an already signed `build/package/Voltra.app` without rebuilding it, use `VOLTRA_REUSE_APP=1 ./build-installer.sh`.
+
 For a local preview:
 
 ```sh
