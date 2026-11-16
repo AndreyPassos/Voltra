@@ -326,3 +326,5 @@ Chamada de teste real: a versão atualizada mostrou WhatsApp com a orientação 
 O usuário confirmou que ouve a chamada normalmente ao ajustar o volume geral na versão atualizada. A retomada automática do controle individual após o fim da chamada ainda não foi verificada nesta sessão.
 
 Após o término da chamada, o usuário informou que testou a retomada do controle e que estava funcionando. O teste foi relatado pelo usuário; não houve medição automatizada do sinal nessa etapa.
+
+Verificação do pacote atual: a imagem foi montada somente para leitura; a assinatura do aplicativo contido nela passou em `codesign --verify --deep --strict`, o executável correspondeu byte a byte ao aplicativo em `build/package`, e o atalho Applications apontou para `/Applications`. A imagem foi desmontada. O executável é arm64, a assinatura é Apple Development e o repositório remoto é privado. SHA-256 do DMG: `14ea60310868ada08f664aa9ecf9a5a76bbff37f3a8a37bd836b1bc4fcc23a8b`. Isso confirma o conteúdo verificado, não a notarização ou compatibilidade com Intel.
