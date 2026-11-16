@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Voltra is a free audio mixer for macOS. Adjust app volume, choose audio outputs, and save your profiles.">
+  <meta name="theme-color" content="#10142b">
+  <title>Voltra — Audio mixer for Mac | CaffeeeLabs</title>
+  <link rel="icon" href="assets/voltra.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="language.js" defer></script>
+</head>
+<body>
+  <header class="frame masthead">
+    <a class="brand" href="./" aria-label="Voltra, home" data-label="home"><img src="assets/voltra.png" width="42" height="42" alt=""> Voltra</a>
+    <div class="header-actions">
+      <a class="source" href="https://github.com/AndreyPassos/Voltra"><span data-text="source">Source on GitHub</span> <span aria-hidden="true">↗</span></a>
+      <label class="language" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>
+        <select aria-label="Language" data-label="language">
+          <option value="en" lang="en">English</option>
+          <option value="pt" lang="pt-BR">Português</option>
+        </select>
+        <svg class="language-chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </label>
+    </div>
+  </header>
+  <main class="frame">
+    <section class="hero" aria-labelledby="intro">
+      <div>
+        <h1 id="intro"><span data-text="heroFirst">Your Mac audio,</span><br><span data-text="heroSecond">your way.</span></h1>
+        <p class="lead" data-text="lead">Adjust the volume of individual apps, switch outputs, and manage your audio profiles in one place.</p>
+        <a class="download" href="downloads/Voltra-0.1.0-macOS.dmg" download><span data-text="download">Download Voltra for Mac</span> <span aria-hidden="true">↓</span></a>
+        <p class="spec" data-text="spec">Free · Apple Silicon · macOS 14.2 or later</p>
+        <a class="quiet" href="#instalar" data-text="installLink">How to install</a>
+      </div>
+      <figure>
+        <div class="mixer" aria-hidden="true">
+          <div class="mixer-head"><img src="assets/voltra.png" width="32" height="32" alt=""><strong>Voltra</strong><span>◉</span></div>
+          <div class="master"><span data-text="master">System volume</span><strong>65%</strong><i style="--level:65%"></i></div>
+          <div class="channel"><b class="note">♫</b><span data-text="music">Music</span><i style="--level:80%"></i><strong>80%</strong></div>
+          <div class="channel"><b class="web">◎</b><span data-text="browser">Browser</span><i style="--level:35%"></i><strong>35%</strong></div>
+          <div class="route"><span data-text="output">Audio output</span><strong data-text="speakers">Mac speakers</strong></div>
+        </div>
+        <figcaption data-text="caption">Illustration of the menu bar mixer</figcaption>
+      </figure>
+    </section>
+    <section class="features" aria-label="Features" data-label="features">
+      <article><h2 data-text="volumeTitle">Per-app volume</h2><p data-text="volumeBody">Adjust or mute active apps from the menu bar. During detected calls, use system volume.</p></article>
+      <article><h2 data-text="devicesTitle">Device switching</h2><p data-text="devicesBody">Choose your input and output, and switch automatically when a preferred device connects.</p></article>
+      <article><h2 data-text="profilesTitle">Profiles and automations</h2><p data-text="profilesBody">Save your settings and apply profiles when an app opens, a device connects, or a scheduled time arrives.</p></article>
+    </section>
+    <section class="details" id="instalar" aria-labelledby="install-title">
+      <div><h2 id="install-title" data-text="installTitle">Installation</h2><ol>
+        <li data-text="stepOpen">Open the DMG and drag Voltra to the Applications folder.</li>
+        <li><span data-text="stepBlocked">If macOS blocks the first launch, see</span> <a href="https://support.apple.com/en-us/102445" data-help data-text="appleHelp">Apple’s instructions</a>. <span data-text="notarization">This development build has not been notarized.</span></li>
+        <li data-text="stepPermission">To use the per-app mixer, allow system audio recording when macOS asks.</li>
+      </ol><a class="quiet" href="downloads/Voltra-0.1.0-macOS.dmg.sha256" data-text="checksum">View installer SHA-256</a></div>
+      <aside aria-labelledby="support-title">
+        <h2 id="support-title" data-text="supportTitle">Support Voltra</h2>
+        <p data-text="supportBody">Voltra is free to download. If it helps you, you can support its development with a coffee.</p>
+        <div class="support-actions">
+          <div class="support-links">
+            <script src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="caffeee" data-color="#B5C5FF" data-emoji="" data-font="Inter" data-text="Buy me a coffee" data-outline-color="#161D42" data-font-color="#161D42" data-coffee-color="#B08FFF"></script>
+            <a class="support-fallback" href="https://buymeacoffee.com/caffeee" data-text="supportAction">Buy me a coffee</a>
+          </div>
+          <a class="support-qr" href="https://buymeacoffee.com/caffeee" aria-label="Scan or open the Buy Me a Coffee profile" data-label="supportQR">
+            <img src="assets/caffeee-qr.png" width="112" height="112" alt="">
+          </a>
+        </div>
+      </aside>
+    </section>
+  </main>
+  <footer class="frame footer"><span><span data-text="credit">Voltra, a project by</span> <strong>CaffeeeLabs</strong></span><a href="https://github.com/AndreyPassos/Voltra">GitHub</a></footer>
+</body>
+</html>
