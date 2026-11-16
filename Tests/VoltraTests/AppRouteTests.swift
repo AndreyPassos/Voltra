@@ -112,14 +112,14 @@ final class SessionRetryTests: XCTestCase {
 }
 
 final class CommunicationPassthroughTests: XCTestCase {
-    func testBypassesOnlyWhenNativeRouteAndUnchangedMixAreProven() {
+    func testActiveCallBypassesRegardlessOfSavedMixAndRoute() {
         let output = AudioDevice(id: 42, uid: "speakers", name: "Speakers", input: false, output: true, builtIn: true)
         let app = ActiveApp(id: "call", name: "Call", processes: [10], inputActive: true, nativeOutputIDs: [42])
         XCTAssertTrue(CommunicationPassthroughPolicy.canBypass(app: app, mix: AppMix(), output: output))
-        XCTAssertFalse(CommunicationPassthroughPolicy.canBypass(app: app, mix: AppMix(volume: 0.5), output: output))
-        XCTAssertFalse(CommunicationPassthroughPolicy.canBypass(app: app, mix: AppMix(muted: true), output: output))
-        XCTAssertFalse(CommunicationPassthroughPolicy.canBypass(app: ActiveApp(id: "call", name: "Call", processes: [10], inputActive: true, nativeOutputIDs: [7]), mix: AppMix(), output: output))
-        XCTAssertFalse(CommunicationPassthroughPolicy.canBypass(app: ActiveApp(id: "call", name: "Call", processes: [10], inputActive: true, nativeOutputIDs: nil), mix: AppMix(), output: output))
+        XCTAssertTrue(CommunicationPassthroughPolicy.canBypass(app: app, mix: AppMix(volume: 0.5), output: output))
+        XCTAssertTrue(CommunicationPassthroughPolicy.canBypass(app: app, mix: AppMix(muted: true), output: output))
+        XCTAssertTrue(CommunicationPassthroughPolicy.canBypass(app: ActiveApp(id: "call", name: "Call", processes: [10], inputActive: true, nativeOutputIDs: [7]), mix: AppMix(), output: output))
+        XCTAssertTrue(CommunicationPassthroughPolicy.canBypass(app: ActiveApp(id: "call", name: "Call", processes: [10], inputActive: true, nativeOutputIDs: nil), mix: AppMix(), output: output))
         XCTAssertFalse(CommunicationPassthroughPolicy.canBypass(app: ActiveApp(id: "music", name: "Music", processes: [10], inputActive: false, nativeOutputIDs: [42]), mix: AppMix(), output: output))
     }
 }

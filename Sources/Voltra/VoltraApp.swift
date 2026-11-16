@@ -148,12 +148,14 @@ struct AppsView: View {
                     } else { Image(systemName: "app.fill").frame(width: 28, height: 28) }
                     Text(app.name)
                     Spacer()
-                    if audio.quarantinedApps.contains(app.id) {
+                    if app.inputActive {
+                        Text("Chamada ativa: use o volume geral.").font(.caption).foregroundStyle(.secondary)
+                    } else if audio.quarantinedApps.contains(app.id) {
                         Text("Reinicie o Voltra para retomar o controle.").font(.caption).foregroundStyle(.orange)
                     } else if audio.desiredApps.contains(app.id) {
                         if audio.passthroughApps.contains(app.id) {
                             Text("Chamada: áudio direto").font(.caption).foregroundStyle(.secondary)
-                                .help("Em 100%, sem silêncio e na saída escolhida, a chamada usa a reprodução nativa para evitar atenuação. Outros volumes usam o mixer.")
+                                .help("Durante chamadas, ajuste o volume geral.")
                         } else if audio.startingApps.contains(app.id) {
                             Text("Iniciando áudio…").font(.caption).foregroundStyle(.secondary)
                         } else if audio.stalledStarts.contains(app.id) {
@@ -169,7 +171,7 @@ struct AppsView: View {
                         Button("Ativar controle") { audio.startApp(app) }
                     }
                 }
-                if !compact { Picker("Saída", selection: Binding(get: { audio.settings(for: app.id).outputUID ?? "" }, set: { audio.setAppOutput(app, uid: $0) })) {
+                if !compact && !app.inputActive { Picker("Saída", selection: Binding(get: { audio.settings(for: app.id).outputUID ?? "" }, set: { audio.setAppOutput(app, uid: $0) })) {
                     Text("Padrão do sistema").tag("")
                     ForEach(audio.devices.filter { $0.output }) { device in
                         Text(!AppOutputSupport.isSupported(device) ? String(format: VoltraLanguage.text("%@ — incompatível"), device.name) : device.name)
@@ -177,16 +179,12 @@ struct AppsView: View {
                     }
                     if let uid = audio.settings(for: app.id).outputUID, !audio.devices.contains(where: { $0.output && $0.uid == uid }) { Text("Saída desconectada").tag(uid) }
                 } }
-                if audio.controlledApps.contains(app.id) || audio.passthroughApps.contains(app.id) {
+                if !app.inputActive && (audio.controlledApps.contains(app.id) || audio.passthroughApps.contains(app.id)) {
                     HStack {
                         Button { audio.setAppMix(app, muted: !audio.settings(for: app.id).muted) } label: { Image(systemName: audio.settings(for: app.id).muted ? "speaker.slash.fill" : "speaker.wave.2.fill") }.accessibilityLabel(Text(VoltraLanguage.format(audio.settings(for: app.id).muted ? "Reativar áudio de %@" : "Silenciar %@", app.name))).help(Text(LocalizedStringKey(audio.settings(for: app.id).muted ? "Reativar áudio" : "Silenciar áudio")))
                         Slider(value: Binding(get: { Double(audio.settings(for: app.id).volume) }, set: { audio.setAppMix(app, volume: Float($0)) }), in: 0...1).accessibilityLabel("Volume de \(app.name)").tint(accent)
                         Text("\(Int((audio.settings(for: app.id).volume * 100).rounded()))%").frame(width: 42)
                     }
-                }
-                if app.inputActive && audio.desiredApps.contains(app.id) && !audio.passthroughApps.contains(app.id) {
-                    Text("O macOS pode reduzir este áudio durante o uso do microfone.")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))

@@ -96,8 +96,8 @@ enum AppRoute {
 }
 
 enum CommunicationPassthroughPolicy {
-    static func canBypass(app: ActiveApp, mix: AppMix, output: AudioDevice) -> Bool {
-        app.inputActive && mix.volume == 1 && !mix.muted && app.nativeOutputIDs == [output.id]
+    static func canBypass(app: ActiveApp, mix: AppMix, output: AudioDevice?) -> Bool {
+        app.inputActive
     }
 }
 
@@ -467,7 +467,7 @@ final class AudioService: ObservableObject {
                 let app = groups[key]
                 let output = AppRoute.output(for: settings(for: key).outputUID, devices: found, defaultID: defaultOutput)
                 let candidate = app.flatMap { app in output.map { SessionSignature(processes: app.processes, outputUID: $0.uid, outputID: sessionDeviceID($0)) } }
-                if let app, let output, CommunicationPassthroughPolicy.canBypass(app: app, mix: settings(for: key), output: output) {
+                if let app, CommunicationPassthroughPolicy.canBypass(app: app, mix: settings(for: key), output: output) {
                     if !passthroughApps.contains(key) { teardownApp(key); passthroughApps.insert(key) }
                     continue
                 }
@@ -718,6 +718,7 @@ final class AudioService: ObservableObject {
     }
     func settings(for id: String) -> AppMix { appSettings[id] ?? AppMix() }
     func setAppMix(_ app: ActiveApp, volume: Float? = nil, muted: Bool? = nil) {
+        guard !activeApps.contains(where: { $0.id == app.id && $0.inputActive }) else { return }
         var state = settings(for: app.id)
         if let volume, volume.isFinite { state.volume = min(1, max(0, volume)) }
         if let muted { state.muted = muted }
@@ -728,6 +729,7 @@ final class AudioService: ObservableObject {
         if activeApps.contains(where: { $0.id == app.id && $0.inputActive }) { refresh() }
     }
     func setAppOutput(_ app: ActiveApp, uid: String?) {
+        guard !activeApps.contains(where: { $0.id == app.id && $0.inputActive }) else { return }
         var state = settings(for: app.id)
         state.outputUID = uid?.isEmpty == false ? uid : nil
         appSettings[app.id] = state

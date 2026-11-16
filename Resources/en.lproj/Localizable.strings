@@ -187,3 +187,5 @@
 "Chamada: áudio direto" = "Call: direct audio";
 "Em 100%, sem silêncio e na saída escolhida, a chamada usa a reprodução nativa para evitar atenuação. Outros volumes usam o mixer." = "At 100%, unmuted and on the selected output, the call uses native playback to avoid attenuation. Other volume levels use the mixer.";
 "O macOS pode reduzir este áudio durante o uso do microfone." = "macOS may reduce this audio while the microphone is in use.";
+
+"Chamada ativa: use o volume geral." = "Active call: use system volume.";
