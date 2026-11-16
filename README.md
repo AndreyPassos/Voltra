@@ -1,51 +1,132 @@
 # Voltra
 
-Aplicativo nativo macOS para acompanhar o áudio e selecionar dispositivos. Versão inicial: macOS 14.2 ou posterior, SwiftUI e Core Audio, sem dependências externas.
+**Your Mac. Your Sound.**
 
-## Executar
+Voltra is a native macOS menu bar app for managing system audio, per-app volume, and audio devices. It is built with SwiftUI and Core Audio and has no external dependencies.
 
-No Terminal, dentro desta pasta, execute `./build-app.sh` e abra `build/Voltra.app`. Para preparar outro pacote sem substituir o que está em uso, execute `VOLTRA_BUILD_OUTPUT=build/candidato/Voltra.app ./build-app.sh`. Por padrão, o aplicativo recebe assinatura ad hoc local e não é distribuído nem notarizado. Para usar uma identidade de desenvolvimento já configurada no chaveiro, informe `VOLTRA_SIGN_IDENTITY="Apple Development: Nome (TEAMID)" ./build-app.sh`; o macOS pode pedir acesso à chave privada. Uma assinatura de desenvolvimento consistente pode evitar solicitações de permissão causadas por mudanças no código assinado, mas não garante a manutenção da autorização nem substitui assinatura de distribuição e notarização. `swift test` executa os testes unitários. A janela principal e o ícone na barra de menus pertencem ao mesmo processo; para encerrá-lo, use “Encerrar Voltra” no menu.
+> Voltra is an early release. The current development installer is for Apple Silicon and is not notarized. Review the device and audio limitations below before using it as your primary audio manager.
 
-## Instalador de desenvolvimento
+## Features
 
-Execute `VOLTRA_SIGN_IDENTITY="Apple Development: Nome (TEAMID)" ./build-installer.sh` para criar `build/Voltra-0.1.0-macOS.dmg`. Abra a imagem e arraste Voltra para Aplicativos. Sem a variável, o build usa assinatura ad hoc. Ambos são pacotes de desenvolvimento: não foram notarizados e o Gatekeeper pode impedir a abertura em outros Macs. Para distribuição ampla, é necessário assinar com Developer ID Application, usar Hardened Runtime e concluir a notarização da Apple; este DMG não representa uma versão pronta para distribuição pública.
+- **System audio** — adjust and mute the default output when the device exposes writable controls.
+- **Per-app mixer** — adjust volume and mute active applications, choose an output, and remember settings between sessions. Automatic control is enabled by default and can be disabled in Settings.
+- **Audio devices** — select default input and output devices, set preferred devices, and automatically switch on connection or disconnection.
+- **Profiles** — save devices, system volume, mute, and app settings. Changes are saved to the active profile. At least one profile is always retained.
+- **Automations** — apply settings when a device connects, an app opens, or a daily schedule is reached.
+- **Menu bar access** — control audio and switch profiles without keeping the main window open.
+- **English and Portuguese** — choose a language in Settings or follow the system language. Other system languages fall back to English.
 
-## O que está implementado
+## Requirements
 
-- Lista de dispositivos de entrada e saída e seleção dos padrões do macOS via Core Audio.
-- Leitura e alteração do volume da saída padrão pelo controle principal ou pelos canais individuais, preservando a proporção entre eles durante a sessão. Silêncio depende de um controle gravável do dispositivo. Alguns dispositivos, como HDMI, não oferecem esses controles.
-- Aplicativos com áudio ativo e controles optativos de volume e mute por Process Tap. Os valores, a saída e a escolha de controlar cada aplicativo são persistidos. Por padrão, o Voltra controla automaticamente todos os aplicativos ativos; em Settings é possível desligar esse modo e controlar aplicativos individualmente. O macOS solicitará acesso à gravação de áudio do sistema. Processos auxiliares podem não ser identificados como parte do aplicativo.
-- Preferências persistentes independentes para entrada e saída por UID e alternância automática opcional: ao iniciar e após mudança na lista de dispositivos, aguarda 1,5 s, tenta selecionar o dispositivo preferido para cada direção e, se indisponível naquela direção, o dispositivo interno atual quando compatível ou o primeiro dispositivo interno compatível. Se nenhum existir, mantém o padrão atual. Ao reconectar, tenta restaurar. A opção é armazenada em UserDefaults. O usuário pode alterar os padrões manualmente; a política só reaplica em alterações da lista, na ativação da opção ou na inicialização.
-- Onboarding, menu bar, navegação e opção de inicialização com o macOS usando ServiceManagement. O registro de inicialização pode depender da localização e assinatura do aplicativo; um aplicativo temporário foi registrado e removido em teste, mas o Voltra instalado ainda precisa ser validado após um login real.
-- Alterações de dispositivos e volume são observadas por notificações do Core Audio; uma consulta a cada dois segundos complementa os eventos, inclusive para processos. O tempo de debounce reduz alternâncias durante reconexões, mas não garante resolução de conflitos com outros utilitários que também mudem o padrão.
+- macOS 14.2 or later.
+- System audio recording permission for per-app control. macOS may request this permission when a Process Tap starts.
+- The provided development installer contains an **arm64** executable. An Intel release has not been tested.
 
-## Limitações importantes
+## Build and run
 
-O mixer usa Process Taps e dispositivos agregados privados; a captura é automática por padrão; em Settings pode ser alterada para ativação por aplicativo. A captura usa buffers estéreo Float32 intercalados; a saída pode ser mono ou estéreo Float32 intercalada e deve ter um único fluxo. No caminho padrão, os fluxos de captura e saída precisam ter a mesma taxa; o Voltra ainda não converte taxas diferentes. Saídas físicas com entrada integrada no mesmo objeto são recusadas para não abrir o microfone involuntariamente. Saídas virtuais duplex usam AUHAL com entrada desabilitada e negociam a taxa do fluxo de captura com a unidade de saída; a conversão 44,1 → 48 kHz foi testada com o dispositivo virtual Microsoft Teams Audio. Formatos não suportados são recusados e o monitor de fluxo interrompe sessões com perdas persistentes. A ponte pré-carrega 2.048 quadros para reduzir perdas na partida, acrescentando cerca de 43 ms a 48 kHz além da latência dos dispositivos. O dispositivo agregado usa compensação de relógio do Core Audio; o teste de continuidade cobre 15 segundos, mas não comprova estabilidade prolongada, latência ou audição humana. O processo de áudio deve estar ativo para aparecer. O controle é reconstruído quando possível após mudanças de processo ou saída. Falhas recebem até duas tentativas automáticas; depois use “Tentar novamente”. A interface permanece utilizável durante a inicialização. Se a sessão iniciar, mas não receber callbacks, o Voltra tenta encerrá-la e informa o erro. Uma chamada do Core Audio pode ficar bloqueada antes disso: nesse caso, a interface informa a espera, mas não consegue cancelar a chamada; reiniciar o Voltra pode ajudar, sem garantia de recuperação. A inicialização também ficou bloqueada em um teste isolado de agregado com tap neste Mac, portanto o controle individual ainda não está validado como confiável. O sistema pode solicitar permissão de captura de áudio. Consulte a [documentação da Apple](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps). A saída individual é escolhida por aplicativo; se estiver desconectada, o Voltra aguarda em vez de selecionar outra saída silenciosamente.
+From the project directory:
 
-Quando o Core Audio informa que um aplicativo com áudio de saída também está usando entrada, o Voltra mantém a reprodução nativa e oculta seus controles individuais de volume, mute e saída. Durante esse período, ajuste o volume geral do dispositivo; as preferências individuais ficam salvas e voltam a valer quando o uso da entrada termina. A mudança evita a atenuação observada no caminho do mixer durante uma chamada de teste do WhatsApp. O usuário confirmou a audição pelo volume geral e relatou a retomada do controle após a chamada. A detecção depende dos metadados do sistema e também pode abranger aplicativos que usem entrada fora de chamadas; a transição pode levar até o próximo ciclo de atualização.
+```sh
+./build-app.sh
+open build/Voltra.app
+```
 
-Aplicativos de chamada podem pedir ao macOS para reduzir outros áudios durante a conversação. Essa atenuação do sistema pode ocorrer sem alterar os valores mostrados pelo Voltra. A configuração pública de ducking documentada pela Apple pertence ao aplicativo que processa a chamada; não há no Voltra uma opção comprovada para sobrescrever a política de outro aplicativo. Consulte a [explicação da Apple sobre processamento de voz](https://developer.apple.com/videos/play/wwdc2023/10235/).
+The script signs the app ad hoc by default. To use a development identity already in your keychain:
 
-Há sempre pelo menos um perfil, que pode ser renomeado. Perfis podem ser criados, selecionados e excluídos com confirmação; o último não pode ser excluído. O perfil ativo é lembrado, e alterações de dispositivos, volume, silêncio e ajustes de aplicativos são salvas nele automaticamente, sem alterar os demais. Ao abrir o Voltra, o perfil ativo é reaplicado se seus dispositivos estiverem disponíveis. Os controles ativados individualmente são lembrados; a opção automática cobre todos os aplicativos ativos; no modo manual, a escolha individual é preservada. Automações suportam conexão de dispositivo, abertura de aplicativo e horário diário; nessa ordem têm prioridade quando eventos coincidem. As regras no mesmo grupo seguem a ordem mostrada. O Voltra precisa permanecer aberto: após repouso, recupera a ocorrência mais recente desde a última consulta, mas não recupera horários enquanto está encerrado. Essa retomada foi testada com relógio simulado e dispositivos reais, ainda sem ciclo físico de repouso. Notificações de dispositivo são opcionais. O atalho ⇧⌘M funciona enquanto o Voltra está ativo. Opcionalmente, o usuário pode habilitar um atalho global de mute e escolher entre ⌃⌥⌘M, ⌃⌥⌘V e ⌃⌥⌘S; conflitos de registro são informados. O histórico guarda as 50 execuções mais recentes. A troca automática de dispositivos está em Devices. Alguns headsets, incluindo o QCY MeloBuds Pro testado neste Mac, aparecem com UIDs distintos. Ao escolher a saída preferida, o Voltra tenta associar a entrada somente quando os identificadores Bluetooth seguem o padrão correspondente e não há ambiguidade; caso contrário, selecione a entrada manualmente. Headsets Bluetooth podem mudar de perfil e qualidade ao usar o microfone. O fallback preserva o dispositivo interno atual quando compatível ou seleciona o primeiro dispositivo interno compatível, sem garantir a identificação de alto-falante ou microfone específicos. A mudança de entrada e saída consiste em duas operações independentes e uma delas pode falhar.
+```sh
+VOLTRA_SIGN_IDENTITY="Apple Development: Name (TEAMID)" ./build-app.sh
+```
 
-A identidade visual segue as imagens de referência fornecidas: azul-marinho, azul/violeta, marca em ondas, cinco menus e onboarding. A interface é uma interpretação funcional inicial, não uma reprodução integral dos mockups. Testes unitários exercitam a decisão de fallback e reconexão, não substituem testes reais com dispositivos físicos. Um teste de integração optativo (`VOLTRA_HARDWARE_TEST=1 swift test --filter HardwareIntegrationTests`) exercitou a política usando dispositivos reais deste Mac, simulando a ausência do headset na lista e restaurando os padrões originais. A mudança de volume e sua observação por outro serviço foram testadas no QCY, assim como a aplicação de perfil e um evento real de dispositivo agregado privado. Uma desconexão e reconexão física do QCY foi observada com o Voltra ativo: a saída passou aos alto-falantes internos e voltou ao QCY; o microfone permaneceu interno, conforme a preferência então configurada. O macOS também pode participar dessa seleção. Em um segundo ciclo físico, com o QCY preferido como entrada e saída, ambos voltaram aos dispositivos internos na desconexão e ao QCY na reconexão. A preferência original pelo microfone interno foi restaurada. Ainda falta validar uma reinicialização de sessão com o Voltra instalado. O teste requer dispositivos internos e um dispositivo externo padrão cuja entrada tenha o mesmo nome.
+A stable signing identity can reduce permission prompts caused by signature changes, but does not guarantee that macOS will retain a grant. To build a separate app bundle without replacing the current one:
 
-## Validação do mixer
+```sh
+VOLTRA_BUILD_OUTPUT=build/candidate/Voltra.app ./build-app.sh
+```
 
-`VOLTRA_TAP_TEST=1 swift test --filter ProcessTapIntegrationTests` toca um tom gerado e mede o áudio na captura e na saída do callback para verificar ganho de 50%, mute e ausência de diferenças entre tamanhos dos buffers no intervalo de teste. `VOLTRA_TAP_OUTPUT=default` usa a saída padrão; sem ele usa os alto-falantes internos. `VOLTRA_TAP_HFP=1` testa o headset com seu microfone como padrão e restaura a entrada ao final. Foram executados testes com os alto-falantes e o QCY, incluindo 15 segundos com o QCY, o modo de chamada mono e a detecção e troca de saída de um aplicativo nativo de teste. Isso não comprova audição, latência ou estabilidade prolongada, nem cobre todos os formatos ou a interação visual completa. O usuário pode precisar conceder permissão de áudio ao Voltra separadamente da concedida ao processo de teste.
+Closing the main window leaves Voltra running in the menu bar. Choose **Quit Voltra** from the menu to exit.
 
-## Testes adicionais
+## Development installer
 
-- `VOLTRA_HARDWARE_TEST=1 swift test --filter HardwareIntegrationTests` exercita dispositivos reais e restaura a seleção anterior; a parte específica de headset é ignorada se não houver um par compatível.
-- `VOLTRA_HARDWARE_VOLUME_TEST=1 swift test --filter HardwareIntegrationTests` altera brevemente volume e silêncio da saída atual e restaura os valores.
-- `VOLTRA_AUTOMATION_TEST=1 VOLTRA_TAP_TEST=1 swift test --filter ProcessTapIntegrationTests` valida um gatilho ao abrir o aplicativo nativo de teste.
-- `VOLTRA_LOGIN_TEST=1 swift test --filter LoginItemIntegrationTests` registra e remove um aplicativo temporário isolado como item de início.
-- `VOLTRA_HOTKEY_TEST=1 swift test --filter GlobalShortcutTests` registra e remove temporariamente um atalho e envia um evento ao próprio processo de teste.
-- `VOLTRA_TAP_DUPLEX=1 VOLTRA_TAP_TEST=1 swift test --filter ProcessTapIntegrationTests` confirma que uma saída com entrada integrada é recusada antes da captura.
+```sh
+VOLTRA_SIGN_IDENTITY="Apple Development: Name (TEAMID)" ./build-installer.sh
+```
 
-Os testes de hardware são optativos porque podem mudar temporariamente o áudio do Mac. Preferências de teste usam domínios isolados. A assinatura local é de desenvolvimento; uma distribuição fora deste Mac requer tratamento adequado de assinatura e notarização.
+This creates `build/Voltra-0.1.0-macOS.dmg`. Open the image and drag Voltra to Applications. Without a signing identity, the build uses an ad hoc signature.
 
-O idioma pode ser escolhido em Settings/Configurações. Por padrão, segue o idioma principal do sistema: português para variantes de português e inglês para os demais.
+The DMG is a development build and has not been notarized. Gatekeeper may prevent it from opening on other Macs. Public distribution requires a Developer ID Application signature, Hardened Runtime, and Apple notarization.
 
-`./scripts/test-concurrent.sh` verifica ganhos e mute independentes em dois processos simultâneos.
+## Calls and audio behavior
+
+When Core Audio reports that an app with active output is also using audio input, Voltra keeps that app on its native audio path and hides its individual volume, mute, and output controls. Use the system volume during this period. Saved app settings are retained and can resume when input activity stops.
+
+This behavior was checked during a WhatsApp test call. Detection uses system process metadata, so it can also apply to apps using input outside a call. A transition can take until the next refresh.
+
+Calling apps can also ask macOS to attenuate other audio. This may occur without changing the values shown in Voltra. Voltra does not currently override another app's ducking policy. See Apple's [voice processing session](https://developer.apple.com/videos/play/wwdc2023/10235/).
+
+## Audio and device limitations
+
+Per-app mixing uses private Core Audio Process Taps and aggregate devices. The standard path accepts interleaved stereo Float32 input and mono or stereo Float32 output with one output stream. Input and output stream rates must match on that path. Unsupported formats are rejected.
+
+Physical output devices that expose input in the same Core Audio device are rejected for per-app capture to avoid inadvertently opening a microphone. Virtual duplex outputs use AUHAL with input disabled. The virtual bridge negotiates the capture rate with the output unit and preloads 2,048 frames, adding approximately 43 ms at 48 kHz. A 44.1 to 48 kHz conversion was tested with Microsoft Teams Audio. Other virtual drivers, perceived latency, and long-duration stability require further validation.
+
+Only applications with active audio processes appear in the mixer. Some helper processes may not be attributed to their parent app. If a selected app output disconnects, Voltra waits for it instead of silently choosing another output.
+
+A session is rebuilt after supported process or device changes. Failed starts receive up to two automatic retries, followed by a manual retry. A Core Audio call can block during initialization, including in a test on this Mac. The UI reports a prolonged wait but cannot cancel that system call. Individual control has not yet been validated as reliable in every configuration.
+
+System volume and mute require writable controls on the output device. Some devices, including HDMI outputs, do not expose them. See Apple's [Process Tap documentation](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps).
+
+## Devices, profiles, and automations
+
+Preferred input and output devices are stored separately by UID. After startup or a device-list change, automatic switching waits 1.5 seconds before selecting each available preferred device. If one is unavailable, Voltra chooses a compatible internal device when possible and restores the preference after reconnection. Manual default-device changes remain in place until the next applicable device event, startup, or re-enabling automatic switching.
+
+Some Bluetooth headsets expose different input and output UIDs. Voltra associates them only when the identifiers match an unambiguous pattern. Otherwise, select the input manually. Bluetooth headsets can change profile and audio quality while their microphone is in use. Input and output changes are separate operations and can fail independently.
+
+The active profile is restored when its devices are available. Changes to devices, system volume, mute, and app settings update that profile without changing other profiles. Automations support device connection, app launch, and a daily time, in that priority order when events coincide. The app must be running. Daily schedules recover the most recent occurrence after sleep, but do not recover events missed while Voltra was closed.
+
+Device notifications are optional. The local mute shortcut is ⇧⌘M. Settings also offers a global mute shortcut using ⌃⌥⌘M, ⌃⌥⌘V, or ⌃⌥⌘S, and reports registration conflicts. Automation history keeps the latest 50 executions.
+
+## Testing
+
+Run the standard suite:
+
+```sh
+swift test
+```
+
+Optional integration tests can temporarily change Mac audio settings or play a generated tone. Test preferences use isolated domains.
+
+```sh
+# Device selection and restoration
+VOLTRA_HARDWARE_TEST=1 swift test --filter HardwareIntegrationTests
+
+# Current output volume and mute, restored afterward
+VOLTRA_HARDWARE_VOLUME_TEST=1 swift test --filter HardwareIntegrationTests
+
+# Process Tap gain, mute, and signal checks
+VOLTRA_TAP_TEST=1 swift test --filter ProcessTapIntegrationTests
+
+# App-launch automation
+VOLTRA_AUTOMATION_TEST=1 VOLTRA_TAP_TEST=1 swift test --filter ProcessTapIntegrationTests
+
+# Temporary login item and global shortcut
+VOLTRA_LOGIN_TEST=1 swift test --filter LoginItemIntegrationTests
+VOLTRA_HOTKEY_TEST=1 swift test --filter GlobalShortcutTests
+
+# Refusal of a physical output with integrated input
+VOLTRA_TAP_DUPLEX=1 VOLTRA_TAP_TEST=1 swift test --filter ProcessTapIntegrationTests
+
+# Independent gain and mute for two audio processes
+./scripts/test-concurrent.sh
+```
+
+For the Process Tap test, `VOLTRA_TAP_OUTPUT=default` selects the default output; otherwise it uses internal speakers. `VOLTRA_TAP_HFP=1` tests a headset with its microphone as the default input and restores the previous input afterward. The test process and Voltra may need separate audio permissions.
+
+QCY headset disconnection and reconnection were observed with Voltra running, including preferred input and output fallback. Tests of buffers and generated signals do not replace listening tests, long-duration testing, or validation across all devices. Launch at login still requires a real login test with the installed app.
+
+See [validation details](docs/VALIDACAO.md) and [development progress](docs/PROGRESSO.md) for test evidence and remaining work.
+
+## Project
+
+Built with SwiftUI, Core Audio, and native macOS frameworks.
+
+**Voltra** by CaffeeeLabs.
