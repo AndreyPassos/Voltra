@@ -65,7 +65,7 @@ Calling apps can also ask macOS to attenuate other audio. This may occur without
 
 ## Audio and device limitations
 
-Per-app mixing uses private Core Audio Process Taps and aggregate devices. The standard path accepts interleaved stereo Float32 input and mono or stereo Float32 output with one output stream. Input and output stream rates must match on that path. Unsupported formats are rejected.
+Per-app mixing uses private Core Audio Process Taps and aggregate devices. The standard path accepts interleaved stereo Float32 input and mono or stereo Float32 output with one output stream. If rates differ on a Bluetooth output-only device, a separate output-only AUHAL bridge can convert compatible stereo audio; unsupported formats are rejected. This fallback was tested with QCY MeloBuds Pro at a 48 kHz capture rate and 44.1 kHz output, and does not enable the audio unit input. It has not been validated with every Bluetooth device or over long sessions.
 
 Physical output devices that expose input in the same Core Audio device are rejected for per-app capture to avoid inadvertently opening a microphone. Virtual duplex outputs use AUHAL with input disabled. The virtual bridge negotiates the capture rate with the output unit and preloads 2,048 frames, adding approximately 43 ms at 48 kHz. A 44.1 to 48 kHz conversion was tested with Microsoft Teams Audio. Other virtual drivers, perceived latency, and long-duration stability require further validation.
 

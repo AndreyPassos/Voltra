@@ -116,6 +116,36 @@ final class ProcessTapIntegrationTests: XCTestCase {
         }
         let simulateStandardCleanupFailure = ProcessInfo.processInfo.environment["VOLTRA_STANDARD_CLEANUP_FAILURE"] == "1"
         let tap = ProcessTap(cleanupResult: { status in simulateStandardCleanupFailure && status == noErr ? -1 : status })
+        if environment["VOLTRA_BLUETOOTH_FALLBACK_TEST"] == "1" {
+            guard output.transport == kAudioDeviceTransportTypeBluetooth, !output.input else { throw XCTSkip("Saída Bluetooth elegível não está ativa") }
+            do {
+                try tap.start(processes: [target], output: output)
+                tap.stop()
+                throw XCTSkip("As taxas coincidem; o caminho alternativo não foi exercitado")
+            } catch ProcessTap.Failure.rateMismatch {
+                XCTAssertFalse(tap.cleanupFailed)
+            }
+            let detectDeadline = Date().addingTimeInterval(8)
+            repeat { service.refresh(); RunLoop.current.run(until: Date().addingTimeInterval(0.1)) } while !service.activeApps.contains(where: { $0.processes.contains(target) }) && Date() < detectDeadline
+            let detected = try XCTUnwrap(service.activeApps.first(where: { $0.processes.contains(target) }))
+            service.startApp(detected)
+            defer { service.stopApp(detected.id) }
+            let startDeadline = Date().addingTimeInterval(15)
+            while !service.controlledApps.contains(detected.id) && Date() < startDeadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+            XCTAssertTrue(service.controlledApps.contains(detected.id), service.error ?? "A conversão Bluetooth não iniciou")
+            XCTAssertNotNil(service.sessionClientRate(for: detected.id), "A sessão deve usar a ponte de conversão")
+            service.setAppMix(detected, volume: 0.5, muted: false)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            let playing = try XCTUnwrap(service.sessionDiagnostics(for: detected.id))
+            XCTAssertGreaterThan(playing.1, 0.001)
+            XCTAssertEqual(playing.2 / playing.1, 0.5, accuracy: 0.03)
+            service.setAppMix(detected, muted: true)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            XCTAssertEqual(try XCTUnwrap(service.sessionDiagnostics(for: detected.id)).2, 0, accuracy: 0.00001)
+            XCTAssertEqual(service.defaultInput, originalInput)
+            XCTAssertEqual(service.defaultOutput, output.id)
+            return
+        }
         let silentLong = environment["VOLTRA_TAP_SILENT_LONG"] == "1"
         tap.setGain(0.5, muted: silentLong)
         if useDuplex {

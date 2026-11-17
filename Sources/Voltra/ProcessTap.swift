@@ -14,6 +14,13 @@ enum OutputStreamListPolicy {
 }
 
 enum StandardFormatPolicy {
+    static func isConvertibleRateMismatch(input: AudioStreamBasicDescription, output: AudioStreamBasicDescription) -> Bool {
+        guard input.mSampleRate.isFinite, output.mSampleRate.isFinite, input.mSampleRate > 0, output.mSampleRate > 0,
+              abs(input.mSampleRate - output.mSampleRate) >= 0.01 else { return false }
+        var matched = output
+        matched.mSampleRate = input.mSampleRate
+        return supports(input: input, output: matched) && output.mChannelsPerFrame == 2
+    }
     static func supports(input: AudioStreamBasicDescription, output: AudioStreamBasicDescription) -> Bool {
         func compatible(_ format: AudioStreamBasicDescription, channels: UInt32) -> Bool {
             format.mFormatID == kAudioFormatLinearPCM && format.mBitsPerChannel == 32 &&
@@ -32,10 +39,12 @@ final class ProcessTap {
     enum Failure: LocalizedError {
         case coreAudio(String, OSStatus)
         case unsupported(String)
+        case rateMismatch
         var errorDescription: String? {
             switch self {
             case let .coreAudio(step, status): return "\(VoltraLanguage.text(step)): Core Audio \(status)"
             case let .unsupported(reason): return reason
+            case .rateMismatch: return VoltraLanguage.text("Formato ou taxa de áudio não suportados para esta saída.")
             }
         }
     }
@@ -113,7 +122,10 @@ final class ProcessTap {
             guard aggregateStreams.count == 1, let inputStream = aggregateStreams.first else { throw Failure.unsupported(VoltraLanguage.text("Quantidade de fluxos de entrada não suportada.")) }
             var inputFormat = AudioStreamBasicDescription()
             try read(inputStream, kAudioStreamPropertyVirtualFormat, into: &inputFormat)
-            guard StandardFormatPolicy.supports(input: inputFormat, output: format) else { throw Failure.unsupported(VoltraLanguage.format("Formato não suportado: entrada %@, saída %@.", String(describing: inputFormat), String(describing: format))) }
+            guard StandardFormatPolicy.supports(input: inputFormat, output: format) else {
+                if StandardFormatPolicy.isConvertibleRateMismatch(input: inputFormat, output: format) { throw Failure.rateMismatch }
+                throw Failure.unsupported(VoltraLanguage.text("Formato ou taxa de áudio não suportados para esta saída."))
+            }
             let state = dsp
             let block: AudioDeviceIOBlock = { _, input, _, output, _ in
                 let ins = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))

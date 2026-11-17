@@ -12,7 +12,9 @@ final class DuplexBridgeExplorationTests: XCTestCase {
         var control = AppControlPreferences(); control.automatic = false; control.save(to: defaults)
         defer { defaults.removePersistentDomain(forName: suite) }
         let service = AudioService(defaults: defaults, startTimer: false)
-        guard let device = service.devices.first(where: { $0.input && $0.output && $0.transport == kAudioDeviceTransportTypeVirtual }) else { throw XCTSkip("Nenhuma saída virtual duplex disponível") }
+        let usePhysicalOutput = ProcessInfo.processInfo.environment["VOLTRA_BRIDGE_PHYSICAL_OUTPUT"] == "1"
+        guard let device = service.devices.first(where: { usePhysicalOutput ? ($0.id == service.defaultOutput && $0.output && !$0.input && !$0.builtIn) : ($0.input && $0.output && $0.transport == kAudioDeviceTransportTypeVirtual) }) else { throw XCTSkip("Saída elegível não disponível") }
+        print("VOLTRA_BRIDGE_DEVICE name=\(device.name) transport=\(device.transport)")
         let originalInput = service.defaultInput, originalOutput = service.defaultOutput
         func check(_ status: OSStatus, _ step: String) throws {
             XCTAssertEqual(status, noErr, "\(step): \(status)")
@@ -57,6 +59,8 @@ final class DuplexBridgeExplorationTests: XCTestCase {
             : DuplexProcessTap(cleanupResult: cleanup, experimentalCaptureRate: differentRate ? 44100 : nil)
         bridge.setGain(0.5, muted: false)
         try bridge.start(processes: [object], output: device)
+        XCTAssertFalse(try bridge.inputEnabled(), "A entrada deve permanecer desativada durante toda a reprodução")
+        print("VOLTRA_BRIDGE_CLIENT_RATE \(bridge.clientSampleRate ?? 0)")
         if differentRate { XCTAssertEqual(bridge.clientSampleRate ?? 0, 44100, accuracy: 0.01) }
         defer { bridge.stop() }
         Thread.sleep(forTimeInterval: 1.0)

@@ -92,6 +92,15 @@ final class AudioDSPTests: XCTestCase {
         output.mSampleRate = input.mSampleRate
         XCTAssertTrue(StandardFormatPolicy.supports(input: input, output: output))
     }
+    func testRateMismatchCanUseConversionOnlyForSupportedLayouts() {
+        let input = AudioStreamBasicDescription(mSampleRate: 48000, mFormatID: kAudioFormatLinearPCM, mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked, mBytesPerPacket: 8, mFramesPerPacket: 1, mBytesPerFrame: 8, mChannelsPerFrame: 2, mBitsPerChannel: 32, mReserved: 0)
+        var output = input; output.mSampleRate = 44100
+        XCTAssertTrue(StandardFormatPolicy.isConvertibleRateMismatch(input: input, output: output))
+        output.mFormatFlags |= kAudioFormatFlagIsNonInterleaved
+        XCTAssertFalse(StandardFormatPolicy.isConvertibleRateMismatch(input: input, output: output))
+        output = input
+        XCTAssertFalse(StandardFormatPolicy.isConvertibleRateMismatch(input: input, output: output))
+    }
     func testStereoTransportReportsBufferedFramesAcrossWritesAndReads() {
         let ring = vaudio_ring_create(4)!
         defer { vaudio_ring_destroy(ring) }

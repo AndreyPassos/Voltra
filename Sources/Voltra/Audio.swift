@@ -806,9 +806,16 @@ final class AudioService: ObservableObject {
         let standardResult = standardCleanupResult
         let dispose = sessionDisposer(for: app.id)
         worker.run({
-            let tap: any ManagedAudioSession = useVirtualDuplex ? DuplexProcessTap(cleanupResult: cleanupResult, experimentalCaptureRate: captureRateOverride) : ProcessTap(cleanupResult: standardResult)
+            var tap: any ManagedAudioSession = useVirtualDuplex ? DuplexProcessTap(cleanupResult: cleanupResult, experimentalCaptureRate: captureRateOverride) : ProcessTap(cleanupResult: standardResult)
             tap.setGain(initialSettings.volume, muted: initialSettings.muted)
-            do { try tap.start(processes: app.processes, output: output) }
+            do {
+                do { try tap.start(processes: app.processes, output: output) }
+                catch ProcessTap.Failure.rateMismatch where !useVirtualDuplex && !output.input && output.transport == kAudioDeviceTransportTypeBluetooth && !tap.cleanupFailed {
+                    tap = DuplexProcessTap(cleanupResult: cleanupResult)
+                    tap.setGain(initialSettings.volume, muted: initialSettings.muted)
+                    try tap.start(processes: app.processes, output: output)
+                }
+            }
             catch {
                 if tap.cleanupFailed { dispose(tap) }
                 throw error
